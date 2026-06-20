@@ -1,0 +1,12 @@
+﻿Thứ_tự,Khối,Luồng,Bot_làm_gì,Nếu_ok,Nếu_lỗi
+1,Scan + Bind,Launcher -> Discovery -> Binding,"Quét MEmu, hiện title, chọn đúng instance rồi bind vm_index, title, pid, hwnd, adb_serial",Cho phép start bot,Không bind được duy nhất thì không cho start
+2,Start Session,Launcher -> Supervisor -> BotWorker,Tạo bot session riêng cho đúng binding đã chọn,Bot vào vòng theo dõi hoặc chơi,Log lỗi rõ binding nào fail
+3,Capture,HWND -> CaptureWorker -> FrameEnvelope,"Chụp frame đúng cửa sổ Windows, gắn bot_id, frame_id, timestamp",Đẩy latest frame sang perception,Timeout hoặc sai identity thì pause hoặc retry có kiểm soát
+4,Identity Check,Frame -> Validator,Kiểm tra title hoặc fingerprint để chắc vẫn đúng giả lập,Cho frame đi tiếp,Loại frame và cảnh báo drift identity
+5,Perception,Frame -> InferenceService,"Detect card, button, text từ ROI cần thiết",Trả kết quả gắn đúng bot_id và frame_id,Log detect fail hoặc hạ tần suất nếu backlog
+6,State Extraction,Detection -> GameState,Biến kết quả nhận diện thành state game chuẩn hóa,Có state để validator và decision dùng,State vô lý thì reject snapshot
+7,Consensus,GameState x 2-3 frame,Chỉ tin state khi ổn định qua nhiều frame liên tiếp,Mở cửa cho decision,"Tiếp tục chờ frame mới, không hành động mù"
+8,Decision,Validated State -> Agent,Chọn action hợp lệ theo luật hoặc chiến lược Tiến Lên,Tạo action plan cụ thể,Nếu chưa chắc thì pass hoặc chờ an toàn tùy policy
+9,Act,Action Plan -> AdbBroker -> Emulator,"Gửi tap, swipe, text qua đúng serial với queue riêng từng thiết bị",Thao tác được thực hiện,"Retry có giới hạn, không burst ADB"
+10,Post-Action Verify,Action -> Capture -> Validator,Nhìn lại màn hình sau thao tác để xác nhận kết quả,Cập nhật state mới,"Fail thì log rõ, có thể retry hoặc pause theo chính sách"
+11,Recovery,Watchdog -> CircuitBreaker -> Supervisor,"Theo dõi timeout capture, ADB, window và tài nguyên hệ thống",Bot khỏe tiếp tục chạy bình thường,"Pause hoặc restart riêng bot lỗi, không restart cả cụm"
