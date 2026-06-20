@@ -13,8 +13,8 @@ class LocalAgent:
         This can be a rule-based system or a small, pre-trained ML model.
         """
         # Example: Simple rule-based logic
-        cards_in_hand = game_state.get("hand", [])
-        last_played_cards = game_state.get("last_played", [])
+        cards_in_hand = game_state.get("my_hand", [])
+        last_played_cards = game_state.get("last_played_cards", [])
 
         if not cards_in_hand:
             return {"action": "pass"}

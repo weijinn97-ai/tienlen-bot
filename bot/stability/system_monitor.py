@@ -1,45 +1,49 @@
-import psutil
-import time
+from __future__ import annotations
+
+try:
+    import psutil
+except ImportError:  # pragma: no cover - environment dependent
+    psutil = None
+
 
 class SystemMonitor:
-    def __init__(self, interval=1):
+    def __init__(self, interval: float = 1) -> None:
         self.interval = interval
 
-    def get_system_metrics(self):
+    def get_system_metrics(self) -> dict[str, float]:
+        if psutil is None:
+            return {"cpu_percent": 0.0, "ram_percent": 0.0}
+
         cpu_percent = psutil.cpu_percent(interval=self.interval)
         ram_percent = psutil.virtual_memory().percent
         return {
             "cpu_percent": cpu_percent,
-            "ram_percent": ram_percent
+            "ram_percent": ram_percent,
         }
 
-    def get_process_metrics(self, process_name):
+    def get_process_metrics(
+        self,
+        process_name: str | None = None,
+        *,
+        pid: int | None = None,
+    ) -> dict[str, float | int | str] | None:
+        if psutil is None:
+            return None
+
         for proc in psutil.process_iter(["pid", "name", "cpu_percent", "memory_percent"]):
-            if process_name.lower() in proc.info["name"].lower():
+            info = proc.info
+            if pid is not None and info["pid"] == pid:
                 return {
-                    "pid": proc.info["pid"],
-                    "name": proc.info["name"],
-                    "cpu_percent": proc.info["cpu_percent"],
-                    "memory_percent": proc.info["memory_percent"]
+                    "pid": info["pid"],
+                    "name": info["name"],
+                    "cpu_percent": info["cpu_percent"],
+                    "memory_percent": info["memory_percent"],
+                }
+            if process_name and process_name.lower() in info["name"].lower():
+                return {
+                    "pid": info["pid"],
+                    "name": info["name"],
+                    "cpu_percent": info["cpu_percent"],
+                    "memory_percent": info["memory_percent"],
                 }
         return None
-
-# Example usage
-if __name__ == "__main__":
-    monitor = SystemMonitor()
-    print("Monitoring system resources...")
-    try:
-        while True:
-            system_metrics = monitor.get_system_metrics()
-            print(f"System: CPU: {system_metrics["cpu_percent"]}% | RAM: {system_metrics["ram_percent"]}% ")
-
-            # Replace "MEmu.exe" with the actual process name of your MEmu emulator
-            memu_metrics = monitor.get_process_metrics("MEmu.exe")
-            if memu_metrics:
-                print(f"MEmu: PID: {memu_metrics["pid"]} | CPU: {memu_metrics["cpu_percent"]}% | RAM: {memu_metrics["memory_percent"]}% ")
-            else:
-                print("MEmu process not found.")
-
-            time.sleep(5)
-    except KeyboardInterrupt:
-        print("Monitoring stopped.")

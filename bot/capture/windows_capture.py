@@ -1,79 +1,84 @@
-import numpy as np
-import cv2
+from __future__ import annotations
+
+from typing import Any
+
 import mss
+import numpy as np
 import win32gui
-import win32ui
-import win32con
+
+from bot.runtime.schemas import CaptureSource
+
 
 class WindowsCapture:
-    def __init__(self, window_name=None):
-        self.window_name = window_name
-        self.sct = mss.mss()
-        self.hwnd = None
-        if self.window_name:
-            self.hwnd = win32gui.FindWindow(None, self.window_name)
-            if not self.hwnd:
-                raise Exception(f'Window not found: {self.window_name}')
+    def __init__(self, *, hwnd: int | None = None, window_name: str | None = None) -> None:
+        if hwnd is None and window_name is None:
+            raise ValueError("Either hwnd or window_name must be provided.")
 
-    def get_screenshot(self):
-        if self.hwnd:
-            # Get window dimensions
-            left, top, right, bot = win32gui.GetWindowRect(self.hwnd)
-            width = right - left
-            height = bot - top
+        resolved_hwnd = hwnd if hwnd is not None else self.find_window(window_name or "")
+        if not resolved_hwnd or not win32gui.IsWindow(resolved_hwnd):
+            raise ValueError("Window handle is invalid or no longer exists.")
 
-            # Adjust for window borders and title bar if necessary
-            # This might need fine-tuning depending on the emulator window style
-            # For simplicity, we'll capture the whole window for now.
+        self.hwnd = resolved_hwnd
+        self.source = CaptureSource.WINDOW_RECT
+        self._sct = mss.mss()
 
-            # Capture the window
-            wincap = {
-                'left': left,
-                'top': top,
-                'width': width,
-                'height': height
-            }
-            sct_img = self.sct.grab(wincap)
-            return np.array(sct_img)
-        else:
-            # Capture primary monitor if no window name is provided
-            sct_img = self.sct.grab(self.sct.monitors[1]) # monitors[0] is all screens, monitors[1] is primary
-            return np.array(sct_img)
+    @staticmethod
+    def find_window(window_name: str) -> int:
+        hwnd = win32gui.FindWindow(None, window_name)
+        if not hwnd:
+            raise ValueError(f"Window not found: {window_name}")
+        return hwnd
 
-    def get_window_info(self):
-        if self.hwnd:
-            left, top, right, bot = win32gui.GetWindowRect(self.hwnd)
-            return {'left': left, 'top': top, 'right': right, 'bottom': bot}
-        return None
+    @staticmethod
+    def enumerate_windows(title_substring: str | None = None) -> list[dict[str, Any]]:
+        windows: list[dict[str, Any]] = []
 
-# Example usage (for testing purposes)
-if __name__ == '__main__':
-    # Replace 'MEmu' with the actual window title of your MEmu emulator
-    # You might need to use a tool like 'Window Spy' to get the exact title
-    window_title = 'MEmu'
-    try:
-        wincap = WindowsCapture(window_title)
-        print(f"Found window: {window_title}")
-        while True:
-            screenshot = wincap.get_screenshot()
-            cv2.imshow('Bot View', screenshot)
+        def callback(hwnd: int, _: Any) -> None:
+            if not win32gui.IsWindowVisible(hwnd):
+                return
 
-            if cv2.waitKey(1) == ord('q'):
-                cv2.destroyAllWindows()
-                break
-    except Exception as e:
-        print(f"Error: {e}")
-        print("Please ensure MEmu is running and the window title is correct.")
-        print("If you don't know the window title, try running without specifying it to capture the primary screen.")
-        try:
-            wincap = WindowsCapture()
-            print("Capturing primary screen.")
-            while True:
-                screenshot = wincap.get_screenshot()
-                cv2.imshow('Bot View (Primary Screen)', screenshot)
-                if cv2.waitKey(1) == ord('q'):
-                    cv2.destroyAllWindows()
-                    break
-        except Exception as e_fallback:
-            print(f"Fallback capture failed: {e_fallback}")
+            title = win32gui.GetWindowText(hwnd)
+            if title_substring and title_substring not in title:
+                return
 
+            windows.append(
+                {
+                    "hwnd": hwnd,
+                    "title": title,
+                    "rect": win32gui.GetWindowRect(hwnd),
+                }
+            )
+
+        win32gui.EnumWindows(callback, None)
+        return windows
+
+    def get_window_rect(self) -> dict[str, int]:
+        left, top, right, bottom = win32gui.GetWindowRect(self.hwnd)
+        width = right - left
+        height = bottom - top
+        if width <= 0 or height <= 0:
+            raise RuntimeError("Window has invalid dimensions for capture.")
+
+        return {
+            "left": left,
+            "top": top,
+            "right": right,
+            "bottom": bottom,
+            "width": width,
+            "height": height,
+        }
+
+    def capture_frame(self) -> np.ndarray:
+        rect = self.get_window_rect()
+        frame = np.array(
+            self._sct.grab(
+                {
+                    "left": rect["left"],
+                    "top": rect["top"],
+                    "width": rect["width"],
+                    "height": rect["height"],
+                }
+            ),
+            copy=True,
+        )
+        return frame[:, :, :3]

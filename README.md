@@ -1,45 +1,32 @@
-# 🃏 Tiến Lên Bot
+# Tien Len Bot
 
-This project aims to develop a real-time Tiến Lên (Vietnamese card game) bot that operates on the MEmu Android emulator. The bot will leverage YOLOv8 for accurate card recognition, advanced computer vision techniques for game state tracking, and robust stability mechanisms to prevent game crashes.
+This project targets a Windows-hosted Tien Len bot for MEmu with a multi-bot architecture that prioritizes stability and identity correctness.
 
-## Features
+## Current direction
 
-*   **Real-time Card Recognition:** Utilizes YOLOv8 to accurately identify cards in hand (even when overlapping) and cards played by opponents.
-*   **Dynamic Game State Tracking:** Monitors the game state, including player turns, remaining cards, and active combos.
-*   **Robust Stability:** Implements crash handling and connection monitoring to ensure continuous operation.
-*   **Detailed Logging:** Records game events and screenshots for debugging and analysis.
-*   **AI Agent (Future):** Integrates a decision-making AI to play the game strategically.
+- one bot = one isolated worker process
+- explicit `bot_id <-> hwnd <-> adb_serial <-> pid` binding
+- Windows-side capture only
+- shared inference and ADB services behind bounded queues
+- isolated recovery when one emulator instance fails
 
-## Project Structure
+## Repository highlights
 
-```
-tienlen-bot/
-├── bot/                  # Core bot logic and modules
-│   ├── capture/          # Screen capture and processing
-│   ├── recognition/      # Card recognition (YOLOv8, OCR)
-│   ├── stability/        # Crash handling, connection monitoring
-│   ├── state/            # Game state management, card tracking
-│   ├── actions/          # ADB tap/swipe actions
-│   └── logging/          # Game event logging
-├── data/                 # Training data (images, labels)
-│   ├── images/           # Raw image files (train, val, test)
-│   └── labels/           # YOLO format label files (train, val, test)
-├── configs/              # Configuration files (YOLO dataset, ROIs)
-├── models/               # Trained YOLOv8 models
-├── tests/                # Unit and integration tests
-├── .gitignore
-├── README.md
-└── CONTRIBUTING.md
-```
+- [bot/runtime/schemas.py](/D:/tienlenOPus/tienlen-bot/bot/runtime/schemas.py:1): shared binding and frame envelope schema
+- [bot/runtime/bot_supervisor.py](/D:/tienlenOPus/tienlen-bot/bot/runtime/bot_supervisor.py:1): lifecycle and admission control
+- [bot/runtime/bot_worker.py](/D:/tienlenOPus/tienlen-bot/bot/runtime/bot_worker.py:1): per-bot actor state
+- [bot/actions/adb_broker.py](/D:/tienlenOPus/tienlen-bot/bot/actions/adb_broker.py:1): serialized ADB access
+- [bot/capture/capture_worker.py](/D:/tienlenOPus/tienlen-bot/bot/capture/capture_worker.py:1): state-driven capture loop
+- [bot/inference/inference_service.py](/D:/tienlenOPus/tienlen-bot/bot/inference/inference_service.py:1): shared inference queue
 
-## Setup and Installation
+## Key runtime rules
 
-*(To be filled in later with detailed instructions)*
+- do not use `adb screencap` in the hot path
+- keep frame queues latest-only
+- require validation and multi-frame consensus before action
+- use circuit breakers and isolated restarts instead of cluster-wide recovery
 
-## Contribution
+## Docs
 
-We welcome contributions to this project! Please refer to `CONTRIBUTING.md` for guidelines on how to contribute.
-
-## License
-
-*(To be filled in later)*
+- [docs/MULTI_BOT_ARCHITECTURE.md](/D:/tienlenOPus/tienlen-bot/docs/MULTI_BOT_ARCHITECTURE.md:1)
+- [docs/MULTI_BOT_SETUP_GUIDE.md](/D:/tienlenOPus/tienlen-bot/docs/MULTI_BOT_SETUP_GUIDE.md:1)
