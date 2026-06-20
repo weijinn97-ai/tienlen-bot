@@ -1,32 +1,52 @@
 # Hướng Dẫn Theo Dõi Online Bằng Google Sheets
 
-Tài liệu này dùng cho link sheet bạn đang theo dõi:
+Tài liệu này dùng cho link sheet đang theo dõi chung của dự án:
 
 - [Google Sheet theo dõi dự án](https://docs.google.com/spreadsheets/d/1pQ8eU043r1phOG67BsO9gDmUK2TKjVAZPSz6MccJ_vc/edit?gid=0#gid=0)
 
 ## Mục tiêu
 
-Sheet này nên trở thành nơi theo dõi online chung cho:
+Sheet này là nơi online chung để:
 
-- tiến độ dự án
+- theo dõi tiến độ dự án
 - ghi chú của agent
-- yêu cầu chỉnh sửa
-- báo cáo hằng ngày
-- quyết định quan trọng
+- gom yêu cầu chỉnh sửa
+- cập nhật báo cáo ngắn hằng ngày
+- lưu các quyết định quan trọng
 
-## Lưu ý hiện tại
+## Trạng thái hiện tại
 
-Trong môi trường Codex hiện tại, sheet này đang yêu cầu quyền truy cập nên mình không thể ghi trực tiếp vào nó từ đây.
+Hiện tại sheet đã mở quyền public edit và có thể seed trực tiếp từ máy Windows này bằng browser automation.
 
-Mình đã chuẩn bị sẵn bộ file import ở:
+Mẫu dữ liệu chuẩn vẫn nằm trong:
 
 - [docs/google_sheet_seed](/D:/tienlenOPus/tienlen-bot/docs/google_sheet_seed)
 
-Bạn chỉ cần import các file CSV đó vào Google Sheet là có thể dùng ngay.
+## Cách seed trực tiếp vào Google Sheet
 
-## Cấu trúc nên có trong Google Sheet
+Nếu link sheet vẫn mở quyền chỉnh sửa, có thể dùng script này:
 
-Tạo hoặc import các tab sau:
+```bash
+py -3 -m pip install playwright
+py -3 tools/seed_google_sheet_public.py --sheet-url "https://docs.google.com/spreadsheets/d/1pQ8eU043r1phOG67BsO9gDmUK2TKjVAZPSz6MccJ_vc/edit?gid=0"
+```
+
+Nếu muốn nhìn thấy browser khi chạy:
+
+```bash
+py -3 tools/seed_google_sheet_public.py --headful
+```
+
+Script sẽ:
+
+1. mở Google Sheet
+2. tạo hoặc cập nhật các tab chuẩn
+3. xóa nội dung cũ trong từng tab chuẩn
+4. dán lại dữ liệu seed mới nhất từ repo
+
+## Cấu trúc tab chuẩn
+
+Các tab chuẩn hiện tại là:
 
 1. `00_Overview`
 2. `01_Task_Board`
@@ -35,123 +55,90 @@ Tạo hoặc import các tab sau:
 5. `04_Daily_Status`
 6. `05_Decisions`
 
-## File import đã có sẵn
-
-- [00_Overview.csv](/D:/tienlenOPus/tienlen-bot/docs/google_sheet_seed/00_Overview.csv)
-- [01_Task_Board.csv](/D:/tienlenOPus/tienlen-bot/docs/google_sheet_seed/01_Task_Board.csv)
-- [02_Agent_Notes.csv](/D:/tienlenOPus/tienlen-bot/docs/google_sheet_seed/02_Agent_Notes.csv)
-- [03_Change_Requests.csv](/D:/tienlenOPus/tienlen-bot/docs/google_sheet_seed/03_Change_Requests.csv)
-- [04_Daily_Status.csv](/D:/tienlenOPus/tienlen-bot/docs/google_sheet_seed/04_Daily_Status.csv)
-- [05_Decisions.csv](/D:/tienlenOPus/tienlen-bot/docs/google_sheet_seed/05_Decisions.csv)
-
-## Cách import nhanh
-
-1. Mở Google Sheet của bạn.
-2. Tạo tab mới hoặc xóa nội dung tab cũ nếu muốn thay thế.
-3. Chọn `File -> Import`.
-4. Upload từng file CSV trong `docs/google_sheet_seed`.
-5. Chọn import vào sheet mới hoặc tab mới.
-6. Đổi tên tab đúng như tên file nếu cần.
-
-## Cách share để nhiều agent cùng xem và cập nhật
-
-Khuyến nghị an toàn:
-
-- Bạn là `Owner`.
-- Những người hoặc tài khoản thật sự cần sửa thì cho quyền `Editor`.
-- Những người chỉ cần xem thì cho quyền `Viewer`.
-- Không nên để `Anyone with the link = Editor` nếu sheet quan trọng.
-
-Nếu vẫn muốn ai có link cũng có thể ghi chú trực tiếp:
-
-- chỉ nên dùng khi sheet này không chứa dữ liệu nhạy cảm
-- nên bảo vệ các tab quan trọng như `00_Overview` và header của `01_Task_Board`
-
-## Cách bảo vệ để tránh bị sửa nhầm
-
-Nên khóa hoặc protect:
-
-- tab `00_Overview`
-- hàng tiêu đề của tất cả tab
-- các cột ID như `Task_ID`, `Request_ID`, `Decision_ID`
-
-Nên cho phép chỉnh sửa tự do hơn ở:
-
-- `02_Agent_Notes`
-- `03_Change_Requests`
-- `04_Daily_Status`
-
-## Quy tắc làm việc cho nhiều agent
-
-Mỗi agent nên theo flow này:
-
-1. Xem `00_Overview` để biết dự án đang ở giai đoạn nào.
-2. Xem `01_Task_Board` để biết phần nào đang làm, phần nào làm tiếp.
-3. Nếu có phát hiện, ghi vào `02_Agent_Notes`.
-4. Nếu muốn đề nghị sửa, thêm một dòng mới vào `03_Change_Requests`.
-5. Nếu đã chốt thay đổi quan trọng, thêm vào `05_Decisions`.
-
-## Cách dùng từng tab
+## Ý nghĩa từng tab bằng tiếng Việt
 
 ### `00_Overview`
 
 Dùng để nhìn tổng quan:
 
-- milestone hiện tại
-- tình trạng chung
-- bước tiếp theo khuyến nghị
+- dự án đang ở milestone nào
+- trạng thái ngắn hiện tại
+- bước tiếp theo nên ưu tiên
 
 ### `01_Task_Board`
 
-Dùng để quản lý task chính:
+Dùng để quản lý việc chính:
 
-- mã task
-- đang ở trạng thái nào
-- đã có gì
-- còn phải làm gì tiếp
+- task nào đã xong
+- task nào đang làm
+- task nào làm tiếp
+- còn thiếu gì
 
 ### `02_Agent_Notes`
 
-Dùng cho agent ghi chú:
+Dùng để agent ghi chú nhanh:
 
 - phát hiện mới
-- vấn đề cần nhắc
-- ý tưởng nhanh
+- cảnh báo
+- ý tưởng
+- điểm cần người khác biết trước khi sửa
 
 ### `03_Change_Requests`
 
-Dùng khi cần yêu cầu chỉnh sửa:
+Dùng để yêu cầu chỉnh sửa:
 
 - ai yêu cầu
-- task nào liên quan
-- mức ưu tiên
-- ai đang xử lý
+- yêu cầu gì
+- liên quan task nào
+- mức ưu tiên ra sao
 
 ### `04_Daily_Status`
 
-Dùng để báo cáo ngắn theo ngày:
+Dùng để báo cáo theo ngày:
 
 - hôm nay đã làm gì
 - đang làm gì
 - tiếp theo là gì
-- có blocker không
+- có bị kẹt không
 
 ### `05_Decisions`
 
-Dùng để lưu các quyết định quan trọng để sau này không quên:
+Dùng để lưu quyết định đã chốt:
 
-- đã chốt kiến trúc gì
+- chốt kiến trúc gì
 - vì sao chốt như vậy
 - ảnh hưởng đến phần nào
 
-## Nếu muốn agent tự ghi online từ code
+## Quy tắc dùng cho nhiều agent
 
-Hiện tại phần này chưa thể tự động từ môi trường hiện tại chỉ bằng link sheet.
+Nên theo flow đơn giản này:
 
-Nếu bạn muốn các agent hoặc script tự ghi vào Google Sheet thật sự, cần thêm một trong các cách sau:
+1. đọc `00_Overview` trước để biết bối cảnh
+2. xem `01_Task_Board` để biết đang ưu tiên gì
+3. trước khi sửa lớn, thêm một dòng vào `02_Agent_Notes`
+4. nếu muốn đề xuất thay đổi, thêm một dòng vào `03_Change_Requests`
+5. khi đã chốt hướng đi, ghi vào `05_Decisions`
 
-1. Chia sẻ sheet cho một `Google service account` rồi cung cấp credential JSON.
-2. Tạo một `Google Apps Script Web App` để nhận dữ liệu ghi vào sheet.
-3. Dùng một connector Google Sheets có quyền ghi trực tiếp trong môi trường agent.
+## Khuyến nghị an toàn
 
-Nếu bạn chọn một trong 3 cách này, mình có thể làm tiếp phần tự động hóa để bot hoặc agent cập nhật sheet online theo code.
+Vì link đang là public edit:
+
+- không để dữ liệu nhạy cảm trong sheet
+- nên khóa hàng tiêu đề của các tab chính
+- nên protect tab `00_Overview`
+- nên cân nhắc đổi từ public edit sang share theo email khi quy trình đã ổn định
+
+## Khi nào nên chạy seed lại
+
+Nên chạy lại script seed khi:
+
+- muốn reset bố cục bảng chuẩn
+- muốn đồng bộ sheet với dữ liệu seed mới trong repo
+- có nhiều sửa thử nghiệm làm bảng bị rối
+
+Không nên chạy seed lại nếu:
+
+- người khác đang cập nhật trực tiếp trên các tab chuẩn
+- bạn muốn giữ nguyên nội dung thủ công hiện có trong các tab đó
+
+Vì script hiện tại sẽ ghi đè nội dung trên các tab chuẩn của nó.

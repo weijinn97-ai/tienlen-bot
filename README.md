@@ -75,3 +75,16 @@ Or on this machine, use:
 ```bash
 launch_bot_ui.cmd
 ```
+
+## Online Tracker
+
+The project also has a shared Google Sheet tracker for humans and agents:
+
+- [docs/GOOGLE_SHEET_TRACKER_VI.md](/D:/tienlenOPus/tienlen-bot/docs/GOOGLE_SHEET_TRACKER_VI.md:1)
+
+If the sheet link is publicly editable, you can seed the standard tabs directly from this repo:
+
+```bash
+py -3 -m pip install playwright
+py -3 tools/seed_google_sheet_public.py --sheet-url "https://docs.google.com/spreadsheets/d/1pQ8eU043r1phOG67BsO9gDmUK2TKjVAZPSz6MccJ_vc/edit?gid=0"
+```
