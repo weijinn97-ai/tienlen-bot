@@ -1,0 +1,3 @@
+﻿Decision_ID,Ngày,Chủ_đề,Quyết_định,Lý_do,Ảnh_hưởng,Người_chốt
+D-001,2026-06-21,Kiến trúc bot,"Một bot bằng một process độc lập, chia sẻ inference service và ADB broker","Ổn định hơn, tránh kéo sập toàn cụm khi một bot lỗi",Tất cả agent nên bám theo kiến trúc actor-based này,User + Codex
+D-002,2026-06-21,Định danh giả lập,"Ưu tiên title, vm_index, pid, hwnd và adb_serial; không map theo vị trí cửa sổ",Giảm nhầm bot với nhầm giả lập,Mọi binding và log nên dùng title làm định danh chính,User + Codex

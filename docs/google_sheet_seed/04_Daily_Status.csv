@@ -1,0 +1,2 @@
+﻿Ngày,Milestone,Tóm_tắt_hôm_nay,Đã_xong,Đang_làm,Tiếp_theo,Blocker,Người_cập_nhật
+2026-06-21,M1 - Nền tảng chạy bot và bảng điều khiển,"Đã có launcher, scan giả lập, log realtime, project board song ngữ","Launcher UI, discovery tools, project board, board tiếng Việt","Log readability, graceful stop",Live preview capture rồi perception pipeline,,Codex

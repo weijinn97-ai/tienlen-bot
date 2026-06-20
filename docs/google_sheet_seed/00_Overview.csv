@@ -1,0 +1,9 @@
+﻿Mục,Giá trị
+Tên dự án,TienLen Bot
+Link Google Sheet,https://docs.google.com/spreadsheets/d/1pQ8eU043r1phOG67BsO9gDmUK2TKjVAZPSz6MccJ_vc/edit?gid=0#gid=0
+Ngày cập nhật,2026-06-21
+Milestone hiện tại,M1 - Nền tảng chạy bot và bảng điều khiển
+Trạng thái ngắn,"Đã có launcher, scan giả lập, log realtime. Chưa xong capture preview, perception, decision, action thật."
+Mục tiêu gần nhất,"Làm launcher tốt hơn, thêm preview ảnh live, rồi nối perception và action thật."
+Bước tiếp theo khuyến nghị,"1) Graceful stop, 2) Live preview, 3) Perception pipeline, 4) State extraction, 5) Action execution"
+Ghi chú cho agent,Mọi agent nên cập nhật Notes hoặc Change Requests trước khi sửa phần lớn để tránh đụng nhau.
