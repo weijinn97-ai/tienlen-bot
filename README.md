@@ -31,6 +31,7 @@ This project targets a Windows-hosted Tien Len bot for MEmu with a multi-bot arc
 - [docs/MULTI_BOT_ARCHITECTURE.md](/D:/tienlenOPus/tienlen-bot/docs/MULTI_BOT_ARCHITECTURE.md:1)
 - [docs/MULTI_BOT_SETUP_GUIDE.md](/D:/tienlenOPus/tienlen-bot/docs/MULTI_BOT_SETUP_GUIDE.md:1)
 - [docs/PROJECT_BOARD.md](/D:/tienlenOPus/tienlen-bot/docs/PROJECT_BOARD.md:1)
+- [docs/PROJECT_BOARD_VI.md](/D:/tienlenOPus/tienlen-bot/docs/PROJECT_BOARD_VI.md:1)
 
 ## ADB Scan
 
