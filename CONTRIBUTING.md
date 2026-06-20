@@ -1,6 +1,19 @@
 # Contributing to Tiến Lên Bot
 
-We welcome contributions to the Tiến Lên Bot project! By contributing, you help us build a more robust and intelligent bot.
+We welcome contributions to this project! By contributing, you help us build a more robust and intelligent bot. All contributors, including other agents, are expected to adhere to the [CLAUDE.md guidelines](CLAUDE.md) for coding and project execution.
+
+## CLAUDE.md Guidelines
+
+Before making any changes, please familiarize yourself with the behavioral guidelines outlined in [CLAUDE.md](CLAUDE.md). These guidelines emphasize:
+
+*   **Thinking Before Coding:** Explicitly state assumptions, clarify uncertainties, and surface tradeoffs.
+*   **Simplicity First:** Write the minimum code that solves the problem, avoiding speculative features or over-engineering.
+*   **Surgical Changes:** Touch only what is necessary and clean up only your own mess.
+*   **Goal-Driven Execution:** Define clear, verifiable success criteria for every task.
+
+Adhering to these principles will ensure a consistent, high-quality codebase and efficient collaboration.
+
+
 
 ## How to Contribute
 
@@ -26,6 +39,14 @@ We welcome contributions to the Tiến Lên Bot project! By contributing, you he
 7.  **Create a Pull Request (PR):** Open a Pull Request from your branch to the `main` branch of the original `tienlen-bot` repository. Provide a detailed description of your changes.
 
 ## Contribution Guidelines
+
+### General Principles
+
+*   **Adherence to CLAUDE.md:** All contributions must follow the principles outlined in [CLAUDE.md](CLAUDE.md).
+*   **Communication:** If you are unsure about any aspect of a task or implementation, please ask questions early and often.
+*   **Testing:** Ensure your changes are well-tested and do not introduce regressions.
+
+
 
 ### Code Contributions
 
