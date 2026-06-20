@@ -1,0 +1,59 @@
+path: ../data
+train: images/train
+val: images/val
+test: images/test
+
+nc: 52  # Number of classes (52 playing cards)
+names: # Class names in order (e.g., '2_clubs', '2_diamonds', ..., 'A_spades')
+  0: 2_clubs
+  1: 2_diamonds
+  2: 2_hearts
+  3: 2_spades
+  4: 3_clubs
+  5: 3_diamonds
+  6: 3_hearts
+  7: 3_spades
+  8: 4_clubs
+  9: 4_diamonds
+  10: 4_hearts
+  11: 4_spades
+  12: 5_clubs
+  13: 5_diamonds
+  14: 5_hearts
+  15: 5_spades
+  16: 6_clubs
+  17: 6_diamonds
+  18: 6_hearts
+  19: 6_spades
+  20: 7_clubs
+  21: 7_diamonds
+  22: 7_hearts
+  23: 7_spades
+  24: 8_clubs
+  25: 8_diamonds
+  26: 8_hearts
+  27: 8_spades
+  28: 9_clubs
+  29: 9_diamonds
+  30: 9_hearts
+  31: 9_spades
+  32: 10_clubs
+  33: 10_diamonds
+  34: 10_hearts
+  35: 10_spades
+  36: J_clubs
+  37: J_diamonds
+  38: J_hearts
+  39: J_spades
+  40: Q_clubs
+  41: Q_diamonds
+  42: Q_hearts
+  43: Q_spades
+  44: K_clubs
+  45: K_diamonds
+  46: K_hearts
+  47: K_spades
+  48: A_clubs
+  49: A_diamonds
+  50: A_hearts
+  51: A_spades
