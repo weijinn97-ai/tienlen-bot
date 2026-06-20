@@ -28,6 +28,35 @@ Do not bind by window order, screen position, or guessed index. If the tuple is 
 
 Use [configs/multi_bot_bindings.example.py](/D:/tienlenOPus/tienlen-bot/configs/multi_bot_bindings.example.py:1) as the template for your runtime bindings.
 
+Before writing bindings, scan the live MEmu instances and ADB endpoints:
+
+```bash
+py -3 tools/scan_memu_adb.py
+```
+
+This prints a table with:
+
+- `vm_index`
+- `instance name`
+- `adb serial`
+- `android serial`
+- `window title`
+- `pid`
+- `hwnd`
+
+If you want starter config blocks, run:
+
+```bash
+py -3 tools/scan_memu_adb.py --as-bindings
+```
+
+If your bot already knows the target instance and only needs the exact ADB endpoint, use:
+
+```bash
+py -3 tools/scan_memu_adb.py --vm-index 203 --serial-only
+py -3 tools/scan_memu_adb.py --name-contains "203H AI" --serial-only
+```
+
 Recommended fields:
 
 - `window_title` for human-readable diagnostics.

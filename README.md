@@ -30,3 +30,46 @@ This project targets a Windows-hosted Tien Len bot for MEmu with a multi-bot arc
 
 - [docs/MULTI_BOT_ARCHITECTURE.md](/D:/tienlenOPus/tienlen-bot/docs/MULTI_BOT_ARCHITECTURE.md:1)
 - [docs/MULTI_BOT_SETUP_GUIDE.md](/D:/tienlenOPus/tienlen-bot/docs/MULTI_BOT_SETUP_GUIDE.md:1)
+- [docs/PROJECT_BOARD.md](/D:/tienlenOPus/tienlen-bot/docs/PROJECT_BOARD.md:1)
+
+## ADB Scan
+
+Use the scanner below to map each running MEmu instance to its exact ADB endpoint before creating bindings:
+
+```bash
+py -3 tools/scan_memu_adb.py
+```
+
+To generate `BotBinding` stubs directly:
+
+```bash
+py -3 tools/scan_memu_adb.py --as-bindings
+```
+
+To get only the exact ADB serial for one chosen instance:
+
+```bash
+py -3 tools/scan_memu_adb.py --vm-index 203 --serial-only
+py -3 tools/scan_memu_adb.py --name-contains "203H AI" --serial-only
+```
+
+## Launcher
+
+The repo now includes a Windows launcher UI with:
+
+- emulator selection
+- one-click bot start and stop
+- live detailed log panel
+- copyable `BotBinding` stub for the selected instance
+
+Start it with:
+
+```bash
+py -3 tools/launch_bot_ui.py
+```
+
+Or on this machine, use:
+
+```bash
+launch_bot_ui.cmd
+```
