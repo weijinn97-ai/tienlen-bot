@@ -55,6 +55,12 @@ def parse_args() -> argparse.Namespace:
         default=8000,
         help="Initial wait after page load in milliseconds.",
     )
+    parser.add_argument(
+        "--navigation-timeout-ms",
+        type=int,
+        default=180000,
+        help="Navigation timeout in milliseconds for loading the Google Sheet.",
+    )
     return parser.parse_args()
 
 
@@ -140,7 +146,7 @@ def rename_active_tab(page, new_name: str) -> None:
 
 def create_and_rename_tab(page, tab_name: str) -> None:
     add_button = page.locator(
-        'div[aria-label="Thêm trang tính"], div[aria-label="Add sheet"]'
+        'div.docs-sheet-add-button, div[aria-label="Thêm trang tính"], div[aria-label="Add sheet"]'
     ).first
     add_button.click()
     page.wait_for_timeout(1000)
@@ -186,7 +192,14 @@ def paste_rows(page, rows: list[list[str]]) -> None:
     page.wait_for_timeout(2500)
 
 
-def seed_sheet(sheet_url: str, seed_sheets: list[SeedSheet], browser_path: str, headful: bool, wait_ms: int) -> None:
+def seed_sheet(
+    sheet_url: str,
+    seed_sheets: list[SeedSheet],
+    browser_path: str,
+    headful: bool,
+    wait_ms: int,
+    navigation_timeout_ms: int,
+) -> None:
     Page, sync_playwright = import_playwright()
     _ = Page
 
@@ -200,7 +213,12 @@ def seed_sheet(sheet_url: str, seed_sheets: list[SeedSheet], browser_path: str, 
             permissions=["clipboard-read", "clipboard-write"],
         )
         page = context.new_page()
-        page.goto(sheet_url, wait_until="domcontentloaded", timeout=120000)
+        page.set_default_navigation_timeout(navigation_timeout_ms)
+        page.goto(
+            sheet_url,
+            wait_until="domcontentloaded",
+            timeout=navigation_timeout_ms,
+        )
         page.wait_for_timeout(wait_ms)
         page.locator("#t-name-box").wait_for(timeout=120000)
         page.locator("div.docs-sheet-tab").first.wait_for(timeout=120000)
@@ -234,6 +252,7 @@ def main() -> int:
         browser_path=browser_path,
         headful=args.headful,
         wait_ms=args.wait_ms,
+        navigation_timeout_ms=args.navigation_timeout_ms,
     )
     print(f"Completed seeding {len(seed_sheets)} tab(s) into: {args.sheet_url}")
     return 0

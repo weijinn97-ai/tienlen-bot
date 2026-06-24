@@ -1,0 +1,5 @@
+﻿74b408e (HEAD -> main, origin/main, origin/HEAD) Add detailed build plan tabs to tracker
+82683bd Expand CLAUDE guidelines for project workflow
+465e46c Add public Google Sheet seeding tool
+c87858f Add Google Sheets tracker seed and guide
+c776f92 Add Vietnamese project board

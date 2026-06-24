@@ -88,3 +88,17 @@ If the sheet link is publicly editable, you can seed the standard tabs directly 
 py -3 -m pip install playwright
 py -3 tools/seed_google_sheet_public.py --sheet-url "https://docs.google.com/spreadsheets/d/1pQ8eU043r1phOG67BsO9gDmUK2TKjVAZPSz6MccJ_vc/edit?gid=0"
 ```
+
+## Screenshot Intake
+
+For user-provided screenshots that need to stay accessible to multiple agents before labeling:
+
+```bash
+py -3 tools/import_user_screenshots.py --batch-name your_batch_name --files "C:\path\shot1.png" "C:\path\shot2.png"
+py -3 tools/export_image_index_csv.py
+```
+
+See:
+
+- [data/README.md](/D:/tienlenOPus/tienlen-bot/data/README.md:1)
+- [docs/GOOGLE_SHEET_TRACKER_VI.md](/D:/tienlenOPus/tienlen-bot/docs/GOOGLE_SHEET_TRACKER_VI.md:1)

@@ -12,8 +12,29 @@ This directory contains all the images and labels used for training the YOLOv8 m
     *   `train/`: Labels for training images.
     *   `val/`: Labels for validation images.
     *   `test/`: Labels for testing images.
+*   `submissions/`: Shared intake area for user-provided screenshots before full labeling.
+    *   `<batch_name>/raw/`: Original screenshots copied into the repo for agent access.
+    *   `<batch_name>/manifest.csv`: Shared metadata for each screenshot.
+    *   `<batch_name>/README.md`: Short summary of the batch.
 
 Each image file in `images/` must have a corresponding label file in `labels/` with the same base name (e.g., `image1.png` in `images/train/` will have `image1.txt` in `labels/train/`).
+
+## Recommended Workflow for User Screenshots
+
+When screenshots come from a user chat or manual capture, do not move them straight into `images/train/` yet.
+
+1.  Import them into a shared batch:
+    ```bash
+    py -3 tools/import_user_screenshots.py --batch-name your_batch_name --files "C:\path\shot1.png" "C:\path\shot2.png"
+    ```
+2.  Update the batch `manifest.csv` with visible cards, room ID, and review notes.
+3.  Export the combined Google Sheet index:
+    ```bash
+    py -3 tools/export_image_index_csv.py
+    ```
+4.  Only after review and labeling should selected files move into `images/train|val|test` and `labels/train|val|test`.
+
+This keeps raw intake, card splitting, and final training labels separated so multiple agents can work safely in parallel.
 
 ## Contribution Guidelines for Data
 

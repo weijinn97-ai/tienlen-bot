@@ -7,7 +7,7 @@ class DecisionOrchestrator:
     def __init__(self):
         self.game_state_adapter = GameStateAdapter()
         self.local_agent = LocalAgent()
-        self.free_api_agent = FreeAPIAgent()
+        self.free_api_agent: FreeAPIAgent | None = None
 
     def decide_action(self, raw_game_state: dict) -> dict:
         """
@@ -22,6 +22,8 @@ class DecisionOrchestrator:
         else:
             print("Using Free API Agent for decision.")
             try:
+                if self.free_api_agent is None:
+                    self.free_api_agent = FreeAPIAgent()
                 action = self.free_api_agent.decide_action(adapted_game_state)
                 return action
             except Exception as e:
