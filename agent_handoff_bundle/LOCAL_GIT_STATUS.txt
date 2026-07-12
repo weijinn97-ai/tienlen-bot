@@ -1,27 +1,11 @@
-﻿## main...origin/main
- M README.md
- M bot/agent/decision_orchestrator.py
- M bot/agent/free_api_agent.py
- M configs/agent_config.py
- M data/README.md
- M docs/AGENT_CONFIGURATION.md
- M docs/GOOGLE_SHEET_TRACKER_VI.md
- M docs/WINDOWS_SETUP_GUIDE.md
- M docs/google_sheet_seed/00_Overview.csv
- M docs/google_sheet_seed/01_Task_Board.csv
- M docs/google_sheet_seed/02_Agent_Notes.csv
- M docs/google_sheet_seed/03_Change_Requests.csv
- M docs/google_sheet_seed/04_Daily_Status.csv
- M docs/google_sheet_seed/05_Decisions.csv
- M docs/google_sheet_seed/06_Build_Plan.csv
- M docs/google_sheet_seed/07_Runtime_Flow.csv
- M tools/seed_google_sheet_public.py
-?? .tmp_sheet_seed_image_index/
-?? agent_handoff_bundle/
-?? data/submissions/
-?? docs/AGENT_HANDOFF_VI.md
-?? docs/google_sheet_seed/08_Image_Index.csv
-?? tests/test_free_api_agent.py
-?? tests/test_image_index_export.py
-?? tools/export_image_index_csv.py
-?? tools/import_user_screenshots.py
+## main...origin/main
+ M agent_handoff_bundle/LOCAL_GIT_STATUS.txt
+ M agent_handoff_bundle/README.md
+ M agent_handoff_bundle/RECENT_COMMITS.txt
+?? .github/
+?? agent_handoff_bundle/FULL_PROJECT_HANDOFF_VI.md
+?? agent_handoff_bundle/WORK_COMPLETION_CHECKLIST_VI.md
+?? agent_handoff_bundle/index.html
+?? contracts/
+?? docs/epics/
+?? tests/test_contract_interfaces.py

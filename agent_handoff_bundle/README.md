@@ -24,22 +24,23 @@ Thư mục này được tạo để gửi nhanh cho agent khác khi cần xem b
 
 ## Trạng thái GitHub
 
-GitHub hiện **chưa được cập nhật đầy đủ** với các thay đổi local mới nhất.
+GitHub đang chứa bản đã push gần nhất ở commit `bd6b6c6`.
 
 Tình trạng hiện tại:
 
 - branch local đang ở `main`
-- `HEAD` đang trùng với `origin/main` ở commit gần nhất đã push
-- nhưng working tree còn nhiều file `M` và `??`
-- nghĩa là có thay đổi mới trong máy này chưa được commit và chưa được push lên GitHub
-
-Vì vậy:
-
-- nếu agent khác chỉ nhìn GitHub thì sẽ **thiếu** các thay đổi mới về:
+- lần push gần nhất đã đưa lên:
   - `Free API Agent` đọc token từ env
   - `AGENT_HANDOFF_VI.md`
   - tracker CSV mới
   - image intake/index tools và test mới
+  - `agent_handoff_bundle`
+- file `index.html` trong bundle là phần tổng hợp local mới nhất sau lần push đó
+
+Vì vậy:
+
+- nếu agent khác xem GitHub, họ sẽ thấy gần như toàn bộ bức tranh mới
+- nếu cần đúng bản handoff 1-file HTML này, hãy lấy trực tiếp từ bundle local hoặc push thêm lần nữa
 
 ## Lưu ý khi chia sẻ
 

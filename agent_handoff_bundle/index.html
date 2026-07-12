@@ -1,0 +1,831 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>TienLen Bot Agent Handoff</title>
+  <style>
+    :root {
+      --paper: #f6f2e8;
+      --panel: rgba(255, 252, 245, 0.92);
+      --ink: #19231d;
+      --muted: #5e6e65;
+      --line: rgba(26, 39, 31, 0.12);
+      --accent: #1f5c4d;
+      --accent-soft: rgba(31, 92, 77, 0.12);
+      --warm: #c2772d;
+      --warm-soft: rgba(194, 119, 45, 0.14);
+      --danger: #9a4234;
+      --danger-soft: rgba(154, 66, 52, 0.12);
+      --shadow: 0 20px 60px rgba(33, 39, 34, 0.10);
+      --radius: 18px;
+      --radius-sm: 12px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at top left, rgba(31, 92, 77, 0.14), transparent 30%),
+        radial-gradient(circle at top right, rgba(194, 119, 45, 0.14), transparent 28%),
+        linear-gradient(180deg, #fcfaf4 0%, var(--paper) 100%);
+      font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+      line-height: 1.6;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    .shell {
+      width: min(1440px, calc(100% - 32px));
+      margin: 0 auto 64px;
+    }
+
+    .hero {
+      padding: 48px 0 24px;
+    }
+
+    .hero-card {
+      background: linear-gradient(135deg, rgba(255, 251, 242, 0.96), rgba(245, 238, 225, 0.92));
+      border: 1px solid var(--line);
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .hero-top {
+      padding: 28px 28px 16px;
+      background:
+        linear-gradient(140deg, rgba(31, 92, 77, 0.95), rgba(21, 46, 58, 0.92)),
+        linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0));
+      color: #f8f5ed;
+    }
+
+    .eyebrow {
+      display: inline-block;
+      margin-bottom: 10px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.12);
+      color: #f8f5ed;
+      font-size: 12px;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    h1, h2, h3 {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      line-height: 1.15;
+    }
+
+    h1 {
+      font-size: clamp(2rem, 4vw, 3.45rem);
+      margin-bottom: 10px;
+    }
+
+    h2 {
+      font-size: clamp(1.4rem, 2.1vw, 2rem);
+      margin-bottom: 14px;
+    }
+
+    h3 {
+      font-size: 1.1rem;
+      margin-bottom: 10px;
+    }
+
+    .hero-top p {
+      max-width: 1000px;
+      margin: 0;
+      color: rgba(248, 245, 237, 0.88);
+      font-size: 1.03rem;
+    }
+
+    .hero-meta {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 14px;
+      padding: 22px 28px 28px;
+    }
+
+    .meta-block {
+      padding: 16px 18px;
+      border-radius: var(--radius);
+      background: var(--panel);
+      border: 1px solid var(--line);
+    }
+
+    .meta-label {
+      display: block;
+      margin-bottom: 4px;
+      font-size: 0.8rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    .meta-value {
+      font-weight: 700;
+      font-size: 1rem;
+    }
+
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      margin: 10px 0 24px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(255, 252, 245, 0.88);
+      backdrop-filter: blur(12px);
+      box-shadow: 0 10px 30px rgba(20, 26, 22, 0.08);
+      overflow-x: auto;
+      white-space: nowrap;
+    }
+
+    nav a {
+      display: inline-block;
+      margin: 0 4px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      font-size: 0.95rem;
+      color: var(--ink);
+    }
+
+    nav a:hover {
+      background: var(--accent-soft);
+      text-decoration: none;
+    }
+
+    section {
+      margin-bottom: 22px;
+      padding: 24px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      box-shadow: 0 12px 40px rgba(33, 39, 34, 0.06);
+    }
+
+    .section-kicker {
+      margin-bottom: 8px;
+      color: var(--muted);
+      font-size: 0.82rem;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+    }
+
+    .grid {
+      display: grid;
+      gap: 16px;
+    }
+
+    .cards-4 {
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+
+    .cards-3 {
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    }
+
+    .panel {
+      padding: 18px;
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.66);
+    }
+
+    .panel strong {
+      display: block;
+      margin-bottom: 6px;
+      font-size: 1.05rem;
+    }
+
+    .metric {
+      font-size: 2rem;
+      font-weight: 700;
+      font-family: Georgia, "Times New Roman", serif;
+      margin-bottom: 4px;
+    }
+
+    .chip-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 10px;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 0.9rem;
+      font-weight: 700;
+    }
+
+    .chip.warm {
+      background: var(--warm-soft);
+      color: #8b541f;
+    }
+
+    .chip.danger {
+      background: var(--danger-soft);
+      color: var(--danger);
+    }
+
+    ul.clean {
+      margin: 0;
+      padding-left: 18px;
+    }
+
+    .two-col {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--line);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 880px;
+      background: rgba(255, 255, 255, 0.72);
+    }
+
+    th, td {
+      padding: 12px 14px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+      text-align: left;
+      font-size: 0.93rem;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      background: #f3efe4;
+      color: #26362f;
+      font-size: 0.82rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      z-index: 1;
+    }
+
+    tbody tr:hover {
+      background: rgba(31, 92, 77, 0.05);
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .done {
+      background: rgba(31, 92, 77, 0.14);
+      color: var(--accent);
+    }
+
+    .progress {
+      background: rgba(194, 119, 45, 0.16);
+      color: #8d541e;
+    }
+
+    .next {
+      background: rgba(50, 64, 105, 0.12);
+      color: #324069;
+    }
+
+    .note {
+      padding: 16px 18px;
+      border-radius: var(--radius);
+      border: 1px solid var(--line);
+      background: linear-gradient(135deg, rgba(31, 92, 77, 0.08), rgba(255, 255, 255, 0.72));
+    }
+
+    code, pre {
+      font-family: "Consolas", "Courier New", monospace;
+    }
+
+    pre {
+      margin: 0;
+      padding: 14px;
+      border-radius: var(--radius-sm);
+      overflow-x: auto;
+      background: #1c2420;
+      color: #eef7ef;
+      font-size: 0.9rem;
+    }
+
+    .mini-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .mini-item {
+      padding: 12px 14px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.66);
+    }
+
+    .footer {
+      color: var(--muted);
+      text-align: center;
+      font-size: 0.9rem;
+      padding: 20px 0 0;
+    }
+
+    @media (max-width: 900px) {
+      .shell {
+        width: min(100% - 20px, 1440px);
+      }
+
+      section {
+        padding: 18px;
+      }
+
+      .hero-top,
+      .hero-meta {
+        padding-left: 18px;
+        padding-right: 18px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <header class="hero">
+      <div class="hero-card">
+        <div class="hero-top">
+          <span class="eyebrow">TienLen Bot • Agent Handoff Dashboard</span>
+          <h1>Mot file HTML de doc nhanh va dao sau toan bo du an</h1>
+          <p>Trang nay tong hop lai toan bo boi canh hien tai cua repo, tracker, build plan, runtime flow, du lieu anh va trang thai GitHub de agent moi chi can mo mot file la co the onboard va chon lane lam viec.</p>
+        </div>
+        <div class="hero-meta">
+          <div class="meta-block">
+            <span class="meta-label">Cap nhat</span>
+            <span class="meta-value">2026-06-26</span>
+          </div>
+          <div class="meta-block">
+            <span class="meta-label">Milestone</span>
+            <span class="meta-value">M1 on dinh van hanh, chuan bi M2/M3</span>
+          </div>
+          <div class="meta-block">
+            <span class="meta-label">GitHub reference</span>
+            <span class="meta-value">Lan push gan nhat o <code>bd6b6c6</code>; HTML nay la bundle local moi nhat</span>
+          </div>
+          <div class="meta-block">
+            <span class="meta-label">Google Sheet</span>
+            <span class="meta-value"><a href="https://docs.google.com/spreadsheets/d/1pQ8eU043r1phOG67BsO9gDmUK2TKjVAZPSz6MccJ_vc/edit?gid=0#gid=0">Mo tracker chung</a></span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <nav>
+      <a href="#overview">Tong quan</a>
+      <a href="#read-first">Doc truoc</a>
+      <a href="#snapshot">Trang thai</a>
+      <a href="#rules">Nguyen tac</a>
+      <a href="#tasks">Task board</a>
+      <a href="#plan">Build plan</a>
+      <a href="#runtime">Runtime flow</a>
+      <a href="#decisions">Decisions</a>
+      <a href="#images">Image intake</a>
+      <a href="#git">GitHub</a>
+      <a href="#validate">Validation</a>
+    </nav>
+
+    <section id="overview">
+      <div class="section-kicker">Executive summary</div>
+      <h2>Tong quan nhanh de vao viec</h2>
+      <div class="grid cards-4">
+        <div class="panel">
+          <div class="metric">4</div>
+          <strong>Task da xong</strong>
+          <div>Khung runtime, ADB hot path, scan gia lap MEmu, launcher van hanh.</div>
+        </div>
+        <div class="panel">
+          <div class="metric">8</div>
+          <strong>Task dang lam</strong>
+          <div>Log, graceful stop, validation, tai nguyen, test, image intake, API agent, sheet handoff.</div>
+        </div>
+        <div class="panel">
+          <div class="metric">9</div>
+          <strong>Task lam tiep</strong>
+          <div>Capture production, perception, state extraction, action, post-action verify, multi-bot thuc.</div>
+        </div>
+        <div class="panel">
+          <div class="metric">30</div>
+          <strong>Shared screenshots</strong>
+          <div>1 batch, tat ca dang o <code>needs_bbox_label</code>, da doc bai tay co san.</div>
+        </div>
+      </div>
+      <div class="chip-row">
+        <span class="chip">12 task uu tien cao</span>
+        <span class="chip warm">18 unit tests xanh</span>
+        <span class="chip">GitHub da push day du</span>
+        <span class="chip danger">API mode chua test voi provider that</span>
+      </div>
+    </section>
+
+    <section id="read-first">
+      <div class="section-kicker">Onboarding path</div>
+      <h2>Mo tai lieu nao truoc</h2>
+      <div class="grid cards-3">
+        <div class="panel">
+          <strong>1. Handoff va board</strong>
+          <ul class="clean">
+            <li><a href="docs/AGENT_HANDOFF_VI.md">docs/AGENT_HANDOFF_VI.md</a></li>
+            <li><a href="docs/PROJECT_BOARD_VI.md">docs/PROJECT_BOARD_VI.md</a></li>
+            <li><a href="docs/GOOGLE_SHEET_TRACKER_VI.md">docs/GOOGLE_SHEET_TRACKER_VI.md</a></li>
+          </ul>
+        </div>
+        <div class="panel">
+          <strong>2. Tracker de biet task va plan</strong>
+          <ul class="clean">
+            <li><a href="tracker/00_Overview.csv">tracker/00_Overview.csv</a></li>
+            <li><a href="tracker/01_Task_Board.csv">tracker/01_Task_Board.csv</a></li>
+            <li><a href="tracker/06_Build_Plan.csv">tracker/06_Build_Plan.csv</a></li>
+            <li><a href="tracker/07_Runtime_Flow.csv">tracker/07_Runtime_Flow.csv</a></li>
+          </ul>
+        </div>
+        <div class="panel">
+          <strong>3. Kien truc va data lane</strong>
+          <ul class="clean">
+            <li><a href="docs/MULTI_BOT_ARCHITECTURE.md">docs/MULTI_BOT_ARCHITECTURE.md</a></li>
+            <li><a href="docs/AGENT_CONFIGURATION.md">docs/AGENT_CONFIGURATION.md</a></li>
+            <li><a href="tracker/08_Image_Index.csv">tracker/08_Image_Index.csv</a></li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="snapshot">
+      <div class="section-kicker">Current reality</div>
+      <h2>Du an dang o dau va con thieu gi</h2>
+      <div class="two-col">
+        <div class="panel">
+          <strong>Da co va dung duoc</strong>
+          <ul class="clean">
+            <li>Scan va bind dung gia lap MEmu theo <code>vm_index</code>, <code>title</code>, <code>pid</code>, <code>hwnd</code>, <code>adb_serial</code>.</li>
+            <li>Launcher chon instance, start, stop, xem log realtime.</li>
+            <li>Watchdog, validation co ban, multi-frame consensus scaffold.</li>
+            <li>ADB broker, supervisor, worker va inference scaffold.</li>
+            <li>Google Sheet tracker va bo seed CSV da duoc cap nhat.</li>
+            <li>Image intake workflow cho nhieu agent va HTML handoff bundle.</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <strong>Chua xong truoc khi coi la bot choi that</strong>
+          <ul class="clean">
+            <li>Capture backend production va live preview trong launcher.</li>
+            <li>Perception YOLO/OCR that tu frame game.</li>
+            <li>State extraction that tu man hinh game.</li>
+            <li>Action execution that va verify sau thao tac.</li>
+            <li>Decision engine Tien Len theo luat/chien luoc that.</li>
+            <li>Multi-bot supervision full va resource control that.</li>
+          </ul>
+        </div>
+      </div>
+      <div class="note" style="margin-top: 16px;">
+        <strong>Thu tu khuyen nghi de lam tiep:</strong>
+        graceful stop → live preview capture → perception pipeline → state extraction → action execution → post-action verify → provider-specific API adapter.
+      </div>
+    </section>
+
+    <section id="rules">
+      <div class="section-kicker">Architecture guardrails</div>
+      <h2>Nhung nguyen tac phai giu</h2>
+      <div class="grid cards-3">
+        <div class="panel">
+          <strong>Identity</strong>
+          <ul class="clean">
+            <li>Mot bot gan voi mot worker/process rieng.</li>
+            <li>Khong map bot theo vi tri cua so hay thu tu window.</li>
+            <li>Dinh danh chinh la <code>title</code>, <code>vm_index</code>, <code>pid</code>, <code>hwnd</code>, <code>adb_serial</code>.</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <strong>Runtime</strong>
+          <ul class="clean">
+            <li>Capture la Windows-side; khong dua <code>adb screencap</code> vao hot path.</li>
+            <li>Frame queue bounded va latest-only.</li>
+            <li>Neu state chua chac, khong hanh dong mu.</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <strong>Recovery</strong>
+          <ul class="clean">
+            <li>ADB di qua broker hoac lop dieu khien da chuan hoa.</li>
+            <li>Validation va consensus quan trong hon FPS.</li>
+            <li>Bot loi thi pause/restart rieng le, khong reset ca cum.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section id="tasks">
+      <div class="section-kicker">Tracker / 01_Task_Board</div>
+      <h2>Task board hien tai</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Task</th>
+              <th>Nhom</th>
+              <th>Hang muc</th>
+              <th>Trang thai</th>
+              <th>Uu tien</th>
+              <th>Da co</th>
+              <th>Can lam tiep</th>
+              <th>Phu thuoc</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>M1.1</td><td>Nen tang</td><td>Khung chay bot</td><td><span class="badge done">Da xong</span></td><td>Cao</td><td>Supervisor, worker, frame schema, validation, ADB broker, inference scaffold</td><td>Noi khung nay vao vong choi that</td><td></td></tr>
+            <tr><td>M1.2</td><td>ADB</td><td>Don hot path ADB</td><td><span class="badge done">Da xong</span></td><td>Cao</td><td>ADB chi dieu khien va health check</td><td>Bo sung action that va retry theo loai thao tac</td><td></td></tr>
+            <tr><td>M1.3</td><td>Nhan dien gia lap</td><td>Quet dung gia lap MEmu</td><td><span class="badge done">Da xong</span></td><td>Cao</td><td>Map duoc vm_index, title, pid, hwnd, adb_serial, android_serial</td><td>Luu binding da chon vao config</td><td></td></tr>
+            <tr><td>M1.4</td><td>UI</td><td>Launcher cho nguoi van hanh</td><td><span class="badge done">Da xong</span></td><td>Cao</td><td>Chon gia lap, chay/dung bot, xem log, copy binding</td><td>Them preview anh va profile luu san</td><td></td></tr>
+            <tr><td>M1.5</td><td>UI</td><td>Log de doc hon</td><td><span class="badge progress">Dang lam</span></td><td>Vua</td><td>Log uu tien title, watchdog da gon</td><td>Them mau, loc log, luu log</td><td></td></tr>
+            <tr><td>M1.6</td><td>UI</td><td>Graceful stop</td><td><span class="badge progress">Dang lam</span></td><td>Vua</td><td>Da co nut stop</td><td>Dung mem de khong con exit code xau</td><td></td></tr>
+            <tr><td>M2.0</td><td>Data</td><td>Intake anh va image index dung chung</td><td><span class="badge progress">Dang lam</span></td><td>Vua</td><td>data/submissions, import/export tools, tab 08_Image_Index</td><td>Chuan hoa manifest review va dung image index lam hang cho labeling chung</td><td>M5.2</td></tr>
+            <tr><td>M2.1</td><td>Capture</td><td>Chup anh that tu gia lap</td><td><span class="badge next">Lam tiep</span></td><td>Cao</td><td>Scaffold chup theo cua so</td><td>Them Windows Graphics Capture va live preview</td><td>M1.4</td></tr>
+            <tr><td>M2.2</td><td>Validation</td><td>Kiem tra snapshot dung sai</td><td><span class="badge progress">Dang lam</span></td><td>Cao</td><td>Da co validate co ban</td><td>Them rule kiem tra bai, luot, anchor that</td><td>M2.1</td></tr>
+            <tr><td>M2.3</td><td>Perception</td><td>Nhan dien man hinh game</td><td><span class="badge next">Lam tiep</span></td><td>Cao</td><td>Inference service scaffold</td><td>Noi YOLO/OCR that vao tung bot</td><td>M2.1</td></tr>
+            <tr><td>M2.4</td><td>State</td><td>Rut ra trang thai game</td><td><span class="badge next">Lam tiep</span></td><td>Cao</td><td>Adapter don gian</td><td>Parse trang thai game tu ket qua nhan dien</td><td>M2.3</td></tr>
+            <tr><td>M3.0</td><td>Agent</td><td>Cau hinh Free API Agent an toan</td><td><span class="badge progress">Dang lam</span></td><td>Vua</td><td>Doc token tu env, validate ro, lazy init, fallback local, test xanh</td><td>Map payload/parser theo provider that va test endpoint that</td><td>M3.1</td></tr>
+            <tr><td>M3.1</td><td>Decision</td><td>Bot quyet dinh danh gi</td><td><span class="badge next">Lam tiep</span></td><td>Cao</td><td>Local agent placeholder</td><td>Thay bang luat hoac policy Tien Len that</td><td>M2.4</td></tr>
+            <tr><td>M3.2</td><td>Action</td><td>Bot bam cham that</td><td><span class="badge next">Lam tiep</span></td><td>Cao</td><td>Action executor moi la khung</td><td>Map toa do bai va nut bam</td><td>M2.4</td></tr>
+            <tr><td>M3.3</td><td>Action</td><td>Xac nhan thao tac sau khi bam</td><td><span class="badge next">Lam tiep</span></td><td>Cao</td><td>Kien truc da chua cho</td><td>Xac nhan lai bang anh sau moi action</td><td>M3.2</td></tr>
+            <tr><td>M4.1</td><td>Multi-bot</td><td>Chay nhieu bot that su</td><td><span class="badge next">Lam tiep</span></td><td>Cao</td><td>Kien truc da ho tro ve mat y tuong</td><td>Cho supervisor khoi chay nhieu worker that</td><td>M3.3</td></tr>
+            <tr><td>M4.2</td><td>Tai nguyen</td><td>Quan ly tai nguyen may</td><td><span class="badge progress">Dang lam</span></td><td>Vua</td><td>Co system monitor va limit co ban</td><td>Them nguong CPU/RAM/GPU va giam tai thong minh</td><td>M4.1</td></tr>
+            <tr><td>M4.3</td><td>Recovery</td><td>Tu hoi phuc khi bot loi</td><td><span class="badge next">Lam tiep</span></td><td>Vua</td><td>Co circuit breaker va y tuong restart rieng le</td><td>Tu pause/restart theo chinh sach ro rang</td><td>M4.1</td></tr>
+            <tr><td>M5.1</td><td>Config</td><td>Luu cau hinh nguoi dung</td><td><span class="badge next">Lam tiep</span></td><td>Vua</td><td>Da copy duoc binding stub</td><td>Luu bot da chon va cau hinh ra file</td><td>M1.4</td></tr>
+            <tr><td>M5.2</td><td>Test</td><td>Test day du hon</td><td><span class="badge progress">Dang lam</span></td><td>Vua</td><td>Parser tests, invariant tests, agent config tests, image index export tests</td><td>Them UI smoke test va capture/action integration test</td><td></td></tr>
+            <tr><td>M0.1</td><td>Collab</td><td>Chuan hoa sheet phoi hop agent</td><td><span class="badge progress">Dang lam</span></td><td>Vua</td><td>8 tab tracker, seed script, docs tieng Viet, runtime flow, build plan</td><td>Cap nhat thuong xuyen overview, notes, decisions va daily status</td><td></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="plan">
+      <div class="section-kicker">Tracker / 06_Build_Plan</div>
+      <h2>Build plan end-to-end</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Pha</th>
+              <th>Step</th>
+              <th>Hang muc</th>
+              <th>Muc tieu</th>
+              <th>Dau vao</th>
+              <th>Dau ra</th>
+              <th>Trang thai</th>
+              <th>Nhom</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>P0</td><td>BP0</td><td>Khoa nguyen tac va tracking</td><td>Chot rule kien truc va cach phoi hop</td><td>CLAUDE.md, board, Sheet</td><td>Toan doi lam cung mot huong</td><td><span class="badge done">Da xong</span></td><td>A, E</td></tr>
+            <tr><td>P0</td><td>BP0A</td><td>Sheet handoff va coordination</td><td>Agent moi vao la hieu milestone, risk, task active</td><td>Overview, Task Board, Notes, Daily, Decisions, Build Plan, Runtime Flow, Image Index</td><td>Sheet chung du context de chia viec an toan</td><td><span class="badge progress">Dang lam</span></td><td>A</td></tr>
+            <tr><td>P1</td><td>BP1</td><td>Launcher van hanh tot</td><td>Nguoi dung chon dung gia lap, chay/dung, doc log</td><td>Launcher, scan MEmu/ADB, log panel</td><td>Launcher on dinh cho 1 bot</td><td><span class="badge progress">Dang lam</span></td><td>A</td></tr>
+            <tr><td>P1</td><td>BP1A</td><td>Cau hinh Free API Agent an toan</td><td>Cho phep dung API agent ma khong hardcode token</td><td>agent_config.py, FreeAPIAgent, docs</td><td>Env-based secrets, validate ro, lazy init, fallback local</td><td><span class="badge progress">Dang lam</span></td><td>A</td></tr>
+            <tr><td>P1</td><td>BP2</td><td>Luu cau hinh nguoi dung</td><td>Nho instance da chon va profile bot</td><td>Binding stub, config path</td><td>File config luu instance/profile</td><td><span class="badge next">Lam tiep</span></td><td>A</td></tr>
+            <tr><td>P2</td><td>BP3</td><td>Capture production backend</td><td>Lay anh that tu dung cua so gia lap</td><td>HWND binding, capture scaffold</td><td>Live frame on dinh, khong dung adb screencap</td><td><span class="badge next">Lam tiep</span></td><td>B</td></tr>
+            <tr><td>P2</td><td>BP3A</td><td>Shared screenshot intake</td><td>Giữ metadata va anh user trong hang cho chung</td><td>data/submissions, import/export tools, 08_Image_Index</td><td>Batch raw co manifest ro nguon goc</td><td><span class="badge progress">Dang lam</span></td><td>C</td></tr>
+            <tr><td>P2</td><td>BP4</td><td>Identity recheck tren anh</td><td>Dam bao bot van nhin dung gia lap</td><td>Frame capture, title, fingerprint</td><td>Canh bao/pause khi identity sai</td><td><span class="badge next">Lam tiep</span></td><td>B, E</td></tr>
+            <tr><td>P3</td><td>BP5</td><td>Perception pipeline</td><td>Nhan dien la bai, nut bam, text, luot choi</td><td>Capture live, ROI, inference scaffold</td><td>Ket qua detect/OCR co bot_id va frame_id ro</td><td><span class="badge next">Lam tiep</span></td><td>C</td></tr>
+            <tr><td>P3</td><td>BP6</td><td>State extraction</td><td>Chuyen ket qua nhan dien thanh game state</td><td>Output perception</td><td>State chuan hoa cho bai tren tay, bai tren ban, luot, nut kha dung</td><td><span class="badge next">Lam tiep</span></td><td>C</td></tr>
+            <tr><td>P3</td><td>BP7</td><td>Snapshot validator va consensus</td><td>Khong cho bot quyet dinh tu frame loi</td><td>Game state, frame history</td><td>State chi duoc tin khi on dinh qua 2-3 frame</td><td><span class="badge progress">Dang lam</span></td><td>C, E</td></tr>
+            <tr><td>P4</td><td>BP8</td><td>Action execution that</td><td>Bot biet bam la bai va nut dung vi tri</td><td>ADB broker, layout mapping, validated state</td><td>Tap/swipe dung, co retry hop ly</td><td><span class="badge next">Lam tiep</span></td><td>D</td></tr>
+            <tr><td>P4</td><td>BP9</td><td>Xac nhan sau thao tac</td><td>Nhin lai anh de biet action thanh cong hay khong</td><td>Action result, new frame</td><td>Khong bam lap mu, biet pass/fail tung action</td><td><span class="badge next">Lam tiep</span></td><td>D, B</td></tr>
+            <tr><td>P5</td><td>BP10</td><td>Decision engine Tien Len</td><td>Chon nuoc di hop le va hop ly</td><td>Validated game state</td><td>Danh sach action hop le va action duoc chon</td><td><span class="badge next">Lam tiep</span></td><td>C, D</td></tr>
+            <tr><td>P5</td><td>BP11</td><td>Single-bot end-to-end</td><td>Mot bot co the nhin, hieu, quyet dinh va bam that</td><td>BP3 den BP10</td><td>Bot choi duoc mot phien demo hoan chinh</td><td><span class="badge next">Lam tiep</span></td><td>A, B, C, D</td></tr>
+            <tr><td>P6</td><td>BP12</td><td>Multi-bot supervision</td><td>Nhieu worker that ma khong lan identity</td><td>Single-bot flow on dinh</td><td>Nhieu bot chay rieng process, pause/restart tach biet</td><td><span class="badge next">Lam tiep</span></td><td>E</td></tr>
+            <tr><td>P6</td><td>BP13</td><td>Resource control va recovery</td><td>Giu he thong khong sap khi qua tai</td><td>Supervisor, monitor, broker, watchdog</td><td>Admission control, circuit breaker, restart policy ro</td><td><span class="badge next">Lam tiep</span></td><td>E</td></tr>
+            <tr><td>P7</td><td>BP14</td><td>Hardening va release noi bo</td><td>Cung co test, docs, preset va van hanh</td><td>Tat ca phan truoc</td><td>Ban noi bo on dinh hon cho nhieu agent va operator</td><td><span class="badge next">Lam tiep</span></td><td>A, E</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="runtime">
+      <div class="section-kicker">Tracker / 07_Runtime_Flow</div>
+      <h2>Runtime flow thuc te</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Thu tu</th>
+              <th>Khoi</th>
+              <th>Luong</th>
+              <th>Bot lam gi</th>
+              <th>Neu ok</th>
+              <th>Neu loi</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>1</td><td>Scan + Bind</td><td>Launcher → Discovery → Binding</td><td>Quet MEmu, hien title, chon dung instance va bind vm_index/title/pid/hwnd/adb_serial</td><td>Cho phep start bot</td><td>Khong bind duoc duy nhat thi khong cho start</td></tr>
+            <tr><td>2</td><td>Start Session</td><td>Launcher → Supervisor → BotWorker</td><td>Tao bot session rieng cho binding da chon</td><td>Bot vao vong theo doi hoac choi</td><td>Log loi ro binding nao fail</td></tr>
+            <tr><td>3</td><td>Capture</td><td>HWND → CaptureWorker → FrameEnvelope</td><td>Chup frame dung cua so Windows, gan bot_id, frame_id, timestamp</td><td>Day latest frame sang perception</td><td>Timeout hoac sai identity thi pause/retry co kiem soat</td></tr>
+            <tr><td>4</td><td>Identity Check</td><td>Frame → Validator</td><td>Kiem tra title/fingerprint de chac van dung gia lap</td><td>Cho frame di tiep</td><td>Loai frame va canh bao drift identity</td></tr>
+            <tr><td>5</td><td>Perception</td><td>Frame → InferenceService</td><td>Detect card, button, text tu ROI can thiet</td><td>Tra ket qua gan dung bot_id va frame_id</td><td>Log detect fail hoac ha tan suat neu backlog</td></tr>
+            <tr><td>6</td><td>State Extraction</td><td>Detection → GameState</td><td>Bien ket qua nhan dien thanh state game chuan hoa</td><td>Co state de validator va decision dung</td><td>State vo ly thi reject snapshot</td></tr>
+            <tr><td>7</td><td>Consensus</td><td>GameState × 2-3 frame</td><td>Chi tin state khi on dinh qua nhieu frame lien tiep</td><td>Mo cua cho decision</td><td>Tiep tuc cho frame moi, khong hanh dong mu</td></tr>
+            <tr><td>8</td><td>Decision</td><td>Validated State → LocalAgent / FreeAPIAgent</td><td>Chon action hop le; local mode la mac dinh an toan, API mode chi bat khi env config hop le</td><td>Tao action plan cu the</td><td>Neu chua chac thi pass hoac cho an toan</td></tr>
+            <tr><td>9</td><td>Act</td><td>Action Plan → AdbBroker → Emulator</td><td>Gui tap/swipe/text qua dung serial voi queue rieng tung thiet bi</td><td>Thao tac duoc thuc hien</td><td>Retry co gioi han, khong burst ADB</td></tr>
+            <tr><td>10</td><td>Post-Action Verify</td><td>Action → Capture → Validator</td><td>Nhin lai man hinh sau thao tac de xac nhan ket qua</td><td>Cap nhat state moi</td><td>Fail thi log ro, co the retry hoac pause theo chinh sach</td></tr>
+            <tr><td>11</td><td>Recovery</td><td>Watchdog → CircuitBreaker → Supervisor</td><td>Theo doi timeout capture, ADB, window va tai nguyen he thong</td><td>Bot khoe tiep tuc chay binh thuong</td><td>Pause/restart rieng bot loi, khong restart ca cum</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="decisions">
+      <div class="section-kicker">Tracker / 05_Decisions</div>
+      <h2>Quyet dinh da chot</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th>
+              <th>Ngay</th>
+              <th>Chu de</th>
+              <th>Quyet dinh</th>
+              <th>Ly do</th>
+              <th>Anh huong</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>D-001</td><td>2026-06-21</td><td>Kien truc bot</td><td>Mot bot bang mot process doc lap, chia se inference service va ADB broker</td><td>On dinh hon, tranh keo sap toan cum khi mot bot loi</td><td>Tat ca agent nen bam theo actor-based runtime</td></tr>
+            <tr><td>D-002</td><td>2026-06-21</td><td>Dinh danh gia lap</td><td>Uu tien title, vm_index, pid, hwnd va adb_serial; khong map theo vi tri cua so</td><td>Giam nham bot voi nham gia lap</td><td>Moi binding va log nen dung title lam dinh danh chinh</td></tr>
+            <tr><td>D-003</td><td>2026-06-24</td><td>Cau hinh Free API Agent</td><td>Doc token va endpoint tu bien moi truong; giu local mode la mac dinh; chi khoi tao FreeAPIAgent khi that su dung</td><td>Tranh hardcode secret va tranh local mode fail chi vi thieu token</td><td>Anh huong agent_config, free_api_agent, decision_orchestrator, docs va quy trinh van hanh</td></tr>
+            <tr><td>D-004</td><td>2026-06-24</td><td>Quy trinh intake anh dung chung</td><td>Anh user vao data/submissions/&lt;batch&gt;/raw + manifest truoc; xuat 08_Image_Index cho sheet truoc khi dua vao train/val/test</td><td>Giu provenance ro rang va cho nhieu agent review/label song song</td><td>Anh huong data README, tools import/export image index va quy trinh phối hop labeling</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="images">
+      <div class="section-kicker">Tracker / 08_Image_Index</div>
+      <h2>Image intake va du lieu dang cho label</h2>
+      <div class="grid cards-4">
+        <div class="panel">
+          <div class="metric">30</div>
+          <strong>So anh hien tai</strong>
+          <div>Toan bo nam trong 1 batch chia se cho nhieu agent.</div>
+        </div>
+        <div class="panel">
+          <div class="metric">1</div>
+          <strong>Batch dang co</strong>
+          <div><code>2026-06-21_memu_hand_screenshots</code></div>
+        </div>
+        <div class="panel">
+          <div class="metric">30</div>
+          <strong>Can bbox label</strong>
+          <div>Tat ca dong hien tai deu o <code>needs_bbox_label</code>.</div>
+        </div>
+        <div class="panel">
+          <div class="metric">30</div>
+          <strong>Split status</strong>
+          <div>Tat ca da duoc doc bai tay o muc <code>hand_read</code>.</div>
+        </div>
+      </div>
+      <div class="note" style="margin-top: 16px;">
+        <strong>Flow dung:</strong> import anh vao <code>data/submissions/&lt;batch&gt;/raw</code> → cap nhat <code>manifest.csv</code> → chay <code>py -3 tools/export_image_index_csv.py</code> → chi dua sang <code>train|val|test</code> sau khi review/label ro.
+      </div>
+      <div class="table-wrap" style="margin-top: 16px;">
+        <table>
+          <thead>
+            <tr>
+              <th>Image</th>
+              <th>File</th>
+              <th>Room</th>
+              <th>Round</th>
+              <th>Mode</th>
+              <th>Visible cards</th>
+              <th>Label status</th>
+              <th>Split status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>001</td><td>1.png</td><td>294732</td><td>1/32 18:30 25/04</td><td>Mở</td><td>13</td><td><span class="badge progress">needs_bbox_label</span></td><td>hand_read</td></tr>
+            <tr><td>002</td><td>2.png</td><td>294732</td><td>1/32 18:22 25/04</td><td>Mở</td><td>13</td><td><span class="badge progress">needs_bbox_label</span></td><td>hand_read</td></tr>
+            <tr><td>003</td><td>3.png</td><td>294732</td><td>1/32 18:22 25/04</td><td>Mở</td><td>13</td><td><span class="badge progress">needs_bbox_label</span></td><td>hand_read</td></tr>
+            <tr><td>004</td><td>4.png</td><td>294732</td><td>1/32 18:29 25/04</td><td>Mở</td><td>13</td><td><span class="badge progress">needs_bbox_label</span></td><td>hand_read</td></tr>
+            <tr><td>005</td><td>5.png</td><td>294732</td><td>2/32 19:02 25/04</td><td>Mở</td><td>13</td><td><span class="badge progress">needs_bbox_label</span></td><td>hand_read</td></tr>
+            <tr><td>006</td><td>6.png</td><td>294732</td><td>2/32 19:02 25/04</td><td>Mở</td><td>13</td><td><span class="badge progress">needs_bbox_label</span></td><td>hand_read</td></tr>
+            <tr><td>007</td><td>7.png</td><td>294732</td><td>2/32 19:02 25/04</td><td>Mở</td><td>13</td><td><span class="badge progress">needs_bbox_label</span></td><td>hand_read</td></tr>
+            <tr><td>008</td><td>8.png</td><td>294732</td><td>2/32 19:02 25/04</td><td>Mở</td><td>13</td><td><span class="badge progress">needs_bbox_label</span></td><td>hand_read</td></tr>
+            <tr><td>009</td><td>9.png</td><td>294732</td><td>4/32 19:43 25/04</td><td>Mở</td><td>13</td><td><span class="badge progress">needs_bbox_label</span></td><td>hand_read</td></tr>
+            <tr><td>010</td><td>10.png</td><td>294732</td><td>4/32 19:45 25/04</td><td>Mở</td><td>13</td><td><span class="badge progress">needs_bbox_label</span></td><td>hand_read</td></tr>
+            <tr><td>011</td><td>11.png</td><td>294732</td><td>4/32 19:45 25/04</td><td>Mở</td><td>13</td><td><span class="badge progress">needs_bbox_label</span></td><td>hand_read</td></tr>
+            <tr><td>012</td><td>12.png</td><td>294732</td><td>4/32 19:46 25/04</td><td>Mở</td><td>13</td><td><span class="badge progress">needs_bbox_label</span></td><td>hand_read</td></tr>
+            <tr><td>013</td><td>13.png</td><td>294732</td><td>3/32 19:42 25/04</td><td>Mở</td><td>13</td><td><span class="badge progress">needs_bbox_label</span></td><td>hand_read</td></tr>
+            <tr><td>014</td><td>14.png</td><td>294732</td><td>3/32 19:42 25/04</td><td>Mở</td><td>13</td><td><span class="badge progress">needs_bbox_label</span></td><td>hand_read</td></tr>
+            <tr><td>015</td><td>15.png</td><td>294732</td><td>3/32 19:42 25/04</td><td>Mở</td><td>13</td><td><span class="badge progress">needs_bbox_label</span></td><td>hand_read</td></tr>
+            <tr><td>016</td><td>16.png</td><td>294732</td><td>3/32 19:42 25/04</td><td>Mở</td><td>13</td><td><span class="badge progress">needs_bbox_label</span></td><td>hand_read</td></tr>
+            <tr><td>017</td><td>17.png</td><td>294732</td><td>5/32 20:02 25/04</td><td>Mở</td><td>13</td><td><span class="badge progress">needs_bbox_label</span></td><td>hand_read</td></tr>
+            <tr><td>018</td><td>18.png</td><td>294732</td><td>5/32 20:02 25/04</td><td>Mở</td><td>13</td><td><span class="badge progress">needs_bbox_label</span></td><td>hand_read</td></tr>
+            <tr><td>019</td><td>19.png</td><td>294732</td><td>5/32 20:03 25/04</td><td>Mở</td><td>13</td><td><span class="badge progress">needs_bbox_label</span></td><td>hand_read</td></tr>
+            <tr><td>020</td><td>20.png</td><td>294732</td><td>5/32 20:03 25/04</td><td>Mở</td><td>13</td><td><span class="badge progress">needs_bbox_label</span></td><td>hand_read</td></tr>
+            <tr><td>021</td><td>21 (2).png</td><td>294732</td><td>6/32 20:34 25/04</td><td>Mở</td><td>13</td><td><span class="badge progress">needs_bbox_label</span></td><td>hand_read</td></tr>
+            <tr><td>022</td><td>22.png</td><td>294732</td><td>6/32 20:34 25/04</td><td>Mở</td><td>13</td><td><span class="badge progress">needs_bbox_label</span></td><td>hand_read</td></tr>
+            <tr><td>023</td><td>23.png</td><td>294732</td><td>6/32 20:34 25/04</td><td>Mở</td><td>13</td><td><span class="badge progress">needs_bbox_label</span></td><td>hand_read</td></tr>
+            <tr><td>024</td><td>24.png</td><td>294732</td><td>6/32 20:35 25/04</td><td>Mở</td><td>13</td><td><span class="badge progress">needs_bbox_label</span></td><td>hand_read</td></tr>
+            <tr><td>025</td><td>50.png</td><td>852259</td><td>4/32 16:09 30/04</td><td>Tắt</td><td>13</td><td><span class="badge progress">needs_bbox_label</span></td><td>hand_read</td></tr>
+            <tr><td>026</td><td>52.png</td><td>852259</td><td>3/32 16:07 30/04</td><td>Tắt</td><td>13</td><td><span class="badge progress">needs_bbox_label</span></td><td>hand_read</td></tr>
+            <tr><td>027</td><td>53.png</td><td>852259</td><td>3/32 16:07 30/04</td><td>Tắt</td><td>13</td><td><span class="badge progress">needs_bbox_label</span></td><td>hand_read</td></tr>
+            <tr><td>028</td><td>54.png</td><td>852259</td><td>3/32 16:07 30/04</td><td>Tắt</td><td>13</td><td><span class="badge progress">needs_bbox_label</span></td><td>hand_read</td></tr>
+            <tr><td>029</td><td>55.png</td><td>852259</td><td>3/32 16:08 30/04</td><td>Tắt</td><td>13</td><td><span class="badge progress">needs_bbox_label</span></td><td>hand_read</td></tr>
+            <tr><td>030</td><td>56.png</td><td>852259</td><td>5/32 16:11 30/04</td><td>Tắt</td><td>13</td><td><span class="badge progress">needs_bbox_label</span></td><td>hand_read</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top: 12px; color: var(--muted);">Du lieu day du hon, bao gom <code>repo_relative_path</code>, <code>original_source_path</code> va danh sach <code>cards_visible</code>, nam trong <a href="tracker/08_Image_Index.csv">tracker/08_Image_Index.csv</a>.</p>
+    </section>
+
+    <section id="git">
+      <div class="section-kicker">Repository status</div>
+      <h2>GitHub va repo hien tai</h2>
+      <div class="two-col">
+        <div class="panel">
+          <strong>Trang thai hien tai</strong>
+          <div class="mini-list">
+            <div class="mini-item">GitHub dang o commit <code>bd6b6c6</code> — <em>Add agent handoff bundle, image intake workflow, and API config</em>.</div>
+            <div class="mini-item">Bundle local nay co them <code>index.html</code> de handoff mot file.</div>
+            <div class="mini-item">Neu can chia se qua GitHub, can push tiep sau khi review thay doi moi nay.</div>
+            <div class="mini-item"><a href="https://github.com/weijinn97-ai/tienlen-bot">GitHub repo</a></div>
+          </div>
+        </div>
+        <div class="panel">
+          <strong>5 commit gan nhat</strong>
+          <pre>bd6b6c6 (HEAD -> main, origin/main, origin/HEAD) Add agent handoff bundle, image intake workflow, and API config
+74b408e Add detailed build plan tabs to tracker
+82683bd Expand CLAUDE guidelines for project workflow
+465e46c Add public Google Sheet seeding tool
+c87858f Add Google Sheets tracker seed and guide</pre>
+        </div>
+      </div>
+    </section>
+
+    <section id="validate">
+      <div class="section-kicker">Verification</div>
+      <h2>Validation gan nhat</h2>
+      <div class="grid cards-3">
+        <div class="panel">
+          <strong>Test suite chinh</strong>
+          <pre>py -3 -m unittest discover -s tests -v</pre>
+          <div>Ket qua: 18 tests xanh.</div>
+        </div>
+        <div class="panel">
+          <strong>Lane test moi</strong>
+          <pre>tests.test_free_api_agent
+tests.test_image_index_export
+tests.test_google_sheet_seed_public</pre>
+          <div>Da cover env-based API config, image index export va sheet seed helper.</div>
+        </div>
+        <div class="panel">
+          <strong>Rui ro con mo</strong>
+          <ul class="clean">
+            <li>Chua test Free API Agent voi provider that.</li>
+            <li>Chua noi live preview capture production.</li>
+            <li>Bot chua la gameplay loop hoan chinh.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <div class="footer">
+      Bundle nay uu tien cho onboarding noi bo. Neu chia se ra ngoai, can kiem tra lai cac duong dan local trong image index va manifest truoc.
+    </div>
+  </div>
+</body>
+</html>
