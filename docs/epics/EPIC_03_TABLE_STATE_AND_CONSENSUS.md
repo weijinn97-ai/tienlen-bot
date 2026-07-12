@@ -55,12 +55,18 @@ Decision engine không thể đánh đúng nếu thiếu:
 
 ## Acceptance criteria
 
-- [ ] `TableState` có đủ các field bắt buộc đã chốt.
-- [ ] Card encoding luôn ở format rank+suit string chuẩn.
-- [ ] `player_card_counts` được validate trong `[0, 13]`.
-- [ ] Regular consensus là `2/3` và frame cuối phải thuộc nhóm đồng thuận.
-- [ ] Transition consensus là `3/4`.
-- [ ] State cũ hoặc confidence thấp có thể bị supervisor loại bỏ.
+- [x] `TableState` có đủ các field bắt buộc đã chốt.
+- [x] Card encoding luôn ở format rank+suit string chuẩn.
+- [x] `player_card_counts` được validate trong `[0, 13]`.
+- [x] Regular consensus là `2/3` và frame cuối phải thuộc nhóm đồng thuận.
+- [x] Transition consensus là `3/4`.
+- [x] State cũ hoặc confidence thấp có thể bị worker loại bỏ.
+
+## Trạng thái triển khai
+
+- `TableStateAssembler` và `TableStateConsensus` đã được nối vào typed path của `BotWorker`.
+- Decision adapter đã thống nhất encoding rank+suit và vẫn nhận encoding legacy tại boundary.
+- Chưa production-ready vì card/button/OCR perception thật chưa cấp đủ `PerceptionSnapshot` cho runtime.
 
 ## Dependency
 

@@ -42,11 +42,16 @@ Phương án hybrid:
 
 ## Acceptance criteria
 
-- [ ] Có ROI spec cố định cho 4 avatar positions.
-- [ ] Tín hiệu chính trả được binary/score ổn định trên sample frames.
-- [ ] Có cross-check delta card counts giữa 2 frame.
-- [ ] Chỉ set `turn_owner` khi `signals_agree=True`.
-- [ ] `turn_owner` và `game_phase` đi được vào snapshot/state contract.
+- [x] Có ROI spec cố định cho 4 avatar positions.
+- [x] Tín hiệu chính trả được binary/score ổn định trên sample frames.
+- [x] Có cross-check delta card counts giữa 2 frame.
+- [x] Chỉ set `turn_owner` khi `signals_agree=True`.
+- [x] `turn_owner` và `game_phase` đi được vào snapshot/state contract.
+
+## Trạng thái triển khai
+
+- Core detector và sample-frame tests: hoàn tất trong `bot/perception/turn_owner.py`.
+- Hiệu chỉnh live theo MEmu/runtime: chưa production-ready, vẫn cần chạy soak test trực tiếp.
 
 ## Dependency
 

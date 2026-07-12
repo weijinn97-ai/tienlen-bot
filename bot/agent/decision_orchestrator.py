@@ -1,7 +1,10 @@
 from bot.agent.free_api_agent import FreeAPIAgent
 from bot.agent.local_agent import LocalAgent
+from typing import Any, Mapping
+
 from bot.agent.game_state_adapter import GameStateAdapter
 from configs.agent_config import USE_LOCAL_AGENT, ENABLE_FALLBACK
+from contracts.interfaces import TableState
 
 class DecisionOrchestrator:
     def __init__(self):
@@ -9,7 +12,7 @@ class DecisionOrchestrator:
         self.local_agent = LocalAgent()
         self.free_api_agent: FreeAPIAgent | None = None
 
-    def decide_action(self, raw_game_state: dict) -> dict:
+    def decide_action(self, raw_game_state: TableState | Mapping[str, Any]) -> dict:
         """
         Orchestrates the decision-making process, choosing between local and API agents.
         """

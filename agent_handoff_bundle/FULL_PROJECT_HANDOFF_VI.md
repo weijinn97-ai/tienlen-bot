@@ -1,6 +1,6 @@
 # Full Project Handoff
 
-Cập nhật: 2026-07-12  
+Cập nhật: 2026-07-13
 Phạm vi: bản Markdown đầy đủ để agent mới có thể nắm kỹ toàn bộ dự án mà không cần tự đi dò nhiều file trước.
 
 ---
@@ -212,22 +212,28 @@ Chưa có:
 Đã có:
 
 - inference service scaffold
+- turn-owner core dùng ROI chuẩn hóa, color mask vòng vàng và card-count delta
+- test nhận đúng 4 vị trí lượt chơi trên sample frames thật `1.png` đến `4.png`
 
 Chưa có:
 
 - detect card/button/text từ frame thật
 - OCR/YOLO contract ổn định cho bot_id + frame_id
+- runtime integration và soak test turn-owner trên MEmu live
 
 ### 6.6. State extraction
 
 Đã có:
 
-- game state adapter đơn giản
+- typed path `PerceptionSnapshot -> TableState -> consensus -> DecisionOrchestrator`
+- regular consensus `2/3`, transition consensus `3/4`, latest-frame bắt buộc thuộc nhóm
+- lọc state cũ hoặc confidence thấp
+- adapter hỗ trợ encoding chuẩn và legacy tại boundary
 
 Chưa có:
 
-- parse state thật từ detection/OCR
-- contract đủ để decision/action dùng trực tiếp
+- parse card/button/text thật từ detection/OCR
+- runtime soak test với snapshot thật liên tục
 
 ### 6.7. Decision
 
@@ -605,7 +611,7 @@ py -3 -m unittest discover -s tests -v
 
 Kết quả đã từng xanh:
 
-- `25` tests
+- `46` tests
 
 Những nhóm test đã có:
 
@@ -614,6 +620,9 @@ Những nhóm test đã có:
 - supervisor
 - Google Sheet seed helper
 - image index export
+- turn-owner ROI/highlight/delta/consensus
+- typed table-state assembly, freshness và multi-frame consensus
+- normalized local decision fallback và typed BotWorker path
 - agent config / fallback
 
 Những nhóm test còn yếu/chưa đủ:

@@ -2,15 +2,27 @@ from __future__ import annotations
 
 from typing import Any
 
-import mss
 import numpy as np
-import win32gui
+
+try:
+    import mss
+except ImportError:  # pragma: no cover - depends on the Windows runtime environment
+    mss = None
+
+try:
+    import win32gui
+except ImportError:  # pragma: no cover - depends on the Windows runtime environment
+    win32gui = None
 
 from bot.runtime.schemas import CaptureSource
 
 
 class WindowsCapture:
     def __init__(self, *, hwnd: int | None = None, window_name: str | None = None) -> None:
+        if mss is None or win32gui is None:
+            raise RuntimeError(
+                "WindowsCapture requires the 'mss' and 'pywin32' packages."
+            )
         if hwnd is None and window_name is None:
             raise ValueError("Either hwnd or window_name must be provided.")
 
@@ -24,6 +36,8 @@ class WindowsCapture:
 
     @staticmethod
     def find_window(window_name: str) -> int:
+        if win32gui is None:
+            raise RuntimeError("WindowsCapture requires the 'pywin32' package.")
         hwnd = win32gui.FindWindow(None, window_name)
         if not hwnd:
             raise ValueError(f"Window not found: {window_name}")
@@ -31,6 +45,8 @@ class WindowsCapture:
 
     @staticmethod
     def enumerate_windows(title_substring: str | None = None) -> list[dict[str, Any]]:
+        if win32gui is None:
+            raise RuntimeError("WindowsCapture requires the 'pywin32' package.")
         windows: list[dict[str, Any]] = []
 
         def callback(hwnd: int, _: Any) -> None:

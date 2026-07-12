@@ -1,56 +1,49 @@
+from __future__ import annotations
+
+from typing import Any, Mapping
+
 from configs.agent_config import LOCAL_AGENT_CONFIG
+from contracts.interfaces import card_strength, validate_card_code
+
 
 class LocalAgent:
-    def __init__(self):
+    """Small deterministic fallback that currently supports single-card plays."""
+
+    def __init__(self) -> None:
         self.model_path = LOCAL_AGENT_CONFIG["model_path"]
         self.rules_config = LOCAL_AGENT_CONFIG["rules_config"]
-        # Load local model or rules here
-        print(f"Local Agent initialized with model: {self.model_path} and rules: {self.rules_config}")
 
-    def decide_action(self, game_state: dict) -> dict:
-        """
-        Decides the action to take based on the current game state using local logic.
-        This can be a rule-based system or a small, pre-trained ML model.
-        """
-        # Example: Simple rule-based logic
-        cards_in_hand = game_state.get("my_hand", [])
-        last_played_cards = game_state.get("last_played_cards", [])
+    def decide_action(self, game_state: Mapping[str, Any]) -> dict[str, Any]:
+        if game_state.get("is_my_turn") is False:
+            return {"action": "wait", "reason": "not_my_turn"}
 
+        cards_in_hand = [validate_card_code(card) for card in game_state.get("my_hand", [])]
+        last_played_cards = [
+            validate_card_code(card) for card in game_state.get("last_played_cards", [])
+        ]
         if not cards_in_hand:
-            return {"action": "pass"}
+            return {"action": "pass", "reason": "empty_or_unreadable_hand"}
 
-        # Simple logic: play the smallest single card if possible, otherwise pass
+        sorted_hand = sorted(cards_in_hand, key=card_strength)
         if not last_played_cards:
-            # If it's the first turn or after a pass, play the smallest card
-            if cards_in_hand:
-                smallest_card = sorted(cards_in_hand, key=self._card_value)[0]
-                return {"action": "play", "cards": [smallest_card]}
-        else:
-            # Try to beat the last played cards with a single card
-            if len(last_played_cards) == 1:
-                last_card_value = self._card_value(last_played_cards[0])
-                playable_cards = [c for c in cards_in_hand if self._card_value(c) > last_card_value]
-                if playable_cards:
-                    smallest_playable = sorted(playable_cards, key=self._card_value)[0]
-                    return {"action": "play", "cards": [smallest_playable]}
+            return {
+                "action": "play",
+                "cards": [sorted_hand[0]],
+                "reason": "lead_smallest_single",
+            }
 
-        return {"action": "pass"}
+        if len(last_played_cards) == 1:
+            target_strength = card_strength(last_played_cards[0])
+            playable = [card for card in sorted_hand if card_strength(card) > target_strength]
+            if playable:
+                return {
+                    "action": "play",
+                    "cards": [playable[0]],
+                    "reason": "beat_single_with_smallest_card",
+                }
+
+        return {"action": "pass", "reason": "no_supported_play"}
 
     def _card_value(self, card_str: str) -> int:
-        """
-        Helper to get a numerical value for a card for comparison.
-        (This is a simplified example and needs proper implementation for Tien Len rules)
-        """
-        rank_map = {
-            "3": 0, "4": 1, "5": 2, "6": 3, "7": 4, "8": 5, "9": 6, "10": 7,
-            "J": 8, "Q": 9, "K": 10, "A": 11, "2": 12
-        }
-        suit_map = {"clubs": 0, "diamonds": 1, "hearts": 2, "spades": 3}
-
-        rank_char = card_str.split("_")[0]
-        suit_char = card_str.split("_")[1]
-
-        rank_val = rank_map.get(rank_char, -1)
-        suit_val = suit_map.get(suit_char, -1)
-
-        return rank_val * 4 + suit_val # Combine rank and suit for unique value
+        rank_strength, suit_strength = card_strength(card_str)
+        return rank_strength * 4 + suit_strength

@@ -28,5 +28,8 @@ class ActionExecutor:
             # self.adb_client.tap(x, y) # Example
             print("Simulating tap for passing turn...")
 
+        elif action_type == "wait":
+            return None
+
         else:
             print(f"Unknown action type: {action_type}")
