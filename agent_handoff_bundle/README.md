@@ -1,46 +1,54 @@
 # Agent Bundle
 
-Cập nhật: 2026-06-25
+Cập nhật: 2026-07-12
 
 Thư mục này được tạo để gửi nhanh cho agent khác khi cần xem bối cảnh và làm việc tiếp mà không phải tự dò toàn repo.
 
 ## Mở file nào trước
 
-1. `docs/AGENT_HANDOFF_VI.md`
-2. `docs/PROJECT_BOARD_VI.md`
-3. `docs/GOOGLE_SHEET_TRACKER_VI.md`
-4. `tracker/00_Overview.csv`
-5. `tracker/01_Task_Board.csv`
-6. `tracker/06_Build_Plan.csv`
-7. `tracker/07_Runtime_Flow.csv`
-8. `tracker/08_Image_Index.csv`
+1. `WORK_COMPLETION_CHECKLIST_VI.md`
+2. `FULL_PROJECT_HANDOFF_VI.md`
+3. `index.html`
+4. `docs/AGENT_HANDOFF_VI.md`
+5. `docs/PROJECT_BOARD_VI.md`
+6. `docs/GOOGLE_SHEET_TRACKER_VI.md`
+7. `tracker/00_Overview.csv`
+8. `tracker/01_Task_Board.csv`
+9. `tracker/06_Build_Plan.csv`
+10. `tracker/07_Runtime_Flow.csv`
+11. `tracker/08_Image_Index.csv`
 
 ## Có gì trong đây
 
 - `docs/`: các tài liệu cốt lõi để hiểu dự án, kiến trúc, cấu hình agent và cách dùng sheet
 - `tracker/`: bản CSV của các tab Google Sheet đã seed gần nhất
+- `WORK_COMPLETION_CHECKLIST_VI.md`: checklist dự án rõ Completed / Scaffold / Not finished
+- `FULL_PROJECT_HANDOFF_VI.md`: bản Markdown đầy đủ để agent mới nắm kỹ toàn cục
+- `index.html`: dashboard trực quan để nhìn nhanh milestone, checklist, task board, runtime flow và validation
 - `LOCAL_GIT_STATUS.txt`: snapshot `git status` tại thời điểm gom bundle
 - `RECENT_COMMITS.txt`: 5 commit gần nhất trên branch hiện tại
 
 ## Trạng thái GitHub
 
-GitHub đang chứa bản đã push gần nhất ở commit `bd6b6c6`.
+GitHub đã được đồng bộ với batch handoff mới nhất ở thời điểm cập nhật file này.
 
 Tình trạng hiện tại:
 
 - branch local đang ở `main`
-- lần push gần nhất đã đưa lên:
-  - `Free API Agent` đọc token từ env
-  - `AGENT_HANDOFF_VI.md`
-  - tracker CSV mới
-  - image intake/index tools và test mới
-  - `agent_handoff_bundle`
-- file `index.html` trong bundle là phần tổng hợp local mới nhất sau lần push đó
+- batch mới nhất đã có:
+  - `contracts/` cho interface và contract dự án
+  - `docs/epics/` để chia việc theo 5 epic
+  - `.github/ISSUE_TEMPLATE/agent_work_item.md`
+  - `tests/test_contract_interfaces.py`
+  - `agent_handoff_bundle/WORK_COMPLETION_CHECKLIST_VI.md`
+  - `agent_handoff_bundle/index.html`
+  - `agent_handoff_bundle/FULL_PROJECT_HANDOFF_VI.md`
 
 Vì vậy:
 
-- nếu agent khác xem GitHub, họ sẽ thấy gần như toàn bộ bức tranh mới
-- nếu cần đúng bản handoff 1-file HTML này, hãy lấy trực tiếp từ bundle local hoặc push thêm lần nữa
+- nếu agent khác xem GitHub, họ đã thấy đúng batch handoff / contract / epic / checklist hiện tại
+- nếu muốn nắm nhanh bằng mắt, mở `index.html`
+- nếu muốn giao việc không thiếu sót, mở `WORK_COMPLETION_CHECKLIST_VI.md`
 
 ## Lưu ý khi chia sẻ
 

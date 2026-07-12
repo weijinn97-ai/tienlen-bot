@@ -250,6 +250,94 @@
       color: var(--danger);
     }
 
+    .progress-stack {
+      display: grid;
+      gap: 14px;
+      margin-top: 18px;
+    }
+
+    .progress-line {
+      display: grid;
+      gap: 8px;
+    }
+
+    .progress-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      font-weight: 700;
+    }
+
+    .progress-track {
+      height: 12px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(25, 35, 29, 0.10);
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, #1f5c4d, #3f8a75);
+    }
+
+    .progress-fill.warm {
+      background: linear-gradient(90deg, #c2772d, #e0a057);
+    }
+
+    .progress-fill.danger {
+      background: linear-gradient(90deg, #9a4234, #cb6a58);
+    }
+
+    .checklist-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .check-item {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.7);
+    }
+
+    .mark {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      font-size: 0.86rem;
+      font-weight: 700;
+      flex: 0 0 auto;
+    }
+
+    .mark.done {
+      background: rgba(31, 92, 77, 0.14);
+      color: var(--accent);
+    }
+
+    .mark.progress {
+      background: rgba(194, 119, 45, 0.16);
+      color: #8d541e;
+    }
+
+    .mark.todo {
+      background: rgba(154, 66, 52, 0.12);
+      color: var(--danger);
+    }
+
+    .check-copy strong {
+      display: block;
+      margin-bottom: 2px;
+      font-size: 0.98rem;
+    }
+
     ul.clean {
       margin: 0;
       padding-left: 18px;
@@ -390,15 +478,15 @@
         <div class="hero-meta">
           <div class="meta-block">
             <span class="meta-label">Cap nhat</span>
-            <span class="meta-value">2026-06-26</span>
+            <span class="meta-value">2026-07-12</span>
           </div>
           <div class="meta-block">
             <span class="meta-label">Milestone</span>
-            <span class="meta-value">M1 on dinh van hanh, chuan bi M2/M3</span>
+            <span class="meta-value">Contracts, epics va handoff da dong bo; san sang chia lane implement</span>
           </div>
           <div class="meta-block">
             <span class="meta-label">GitHub reference</span>
-            <span class="meta-value">Lan push gan nhat o <code>bd6b6c6</code>; HTML nay la bundle local moi nhat</span>
+            <span class="meta-value">Batch checklist, contracts, epics, tests va handoff da duoc push len <code>main</code></span>
           </div>
           <div class="meta-block">
             <span class="meta-label">Google Sheet</span>
@@ -410,6 +498,7 @@
 
     <nav>
       <a href="#overview">Tong quan</a>
+      <a href="#checklist">Checklist</a>
       <a href="#read-first">Doc truoc</a>
       <a href="#snapshot">Trang thai</a>
       <a href="#rules">Nguyen tac</a>
@@ -449,19 +538,154 @@
       </div>
       <div class="chip-row">
         <span class="chip">12 task uu tien cao</span>
-        <span class="chip warm">18 unit tests xanh</span>
-        <span class="chip">GitHub da push day du</span>
+        <span class="chip warm">25 unit tests xanh</span>
+        <span class="chip">Checklist truc quan da co</span>
         <span class="chip danger">API mode chua test voi provider that</span>
       </div>
     </section>
 
+    <section id="checklist">
+      <div class="section-kicker">Project checklist</div>
+      <h2>Checklist truc quan: da xong den dau, con thieu gi</h2>
+      <div class="grid cards-3">
+        <div class="panel">
+          <strong>Da verify trong repo</strong>
+          <div class="checklist-list">
+            <div class="check-item">
+              <span class="mark done">[x]</span>
+              <div class="check-copy">
+                <strong>Handoff bundle day du</strong>
+                Co Markdown tong hop, HTML 1 file, tracker CSV va issue template de chia viec.
+              </div>
+            </div>
+            <div class="check-item">
+              <span class="mark done">[x]</span>
+              <div class="check-copy">
+                <strong>Contract package da co</strong>
+                <code>contracts/interfaces.py</code> da chot card encoding, TableState, VerifySpec va consensus.
+              </div>
+            </div>
+            <div class="check-item">
+              <span class="mark done">[x]</span>
+              <div class="check-copy">
+                <strong>Epic roadmap da tach ro</strong>
+                Phase 2 da tach thanh <code>2A</code> va <code>2B</code>, tong cong 5 epic de giao viec song song.
+              </div>
+            </div>
+            <div class="check-item">
+              <span class="mark done">[x]</span>
+              <div class="check-copy">
+                <strong>Test da xac nhan</strong>
+                Full suite <code>25</code> tests xanh, co them lane test cho contract va Free API Agent.
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <strong>Da chot de code tiep</strong>
+          <div class="checklist-list">
+            <div class="check-item">
+              <span class="mark progress">[~]</span>
+              <div class="check-copy">
+                <strong>Card encoding va thu tu so sanh</strong>
+                Dung format <code>{rank}{suit}</code> voi rank <code>3&lt;...&lt;2</code> va suit <code>S&lt;C&lt;D&lt;H</code>.
+              </div>
+            </div>
+            <div class="check-item">
+              <span class="mark progress">[~]</span>
+              <div class="check-copy">
+                <strong>Turn owner hybrid</strong>
+                Tin hieu chinh la avatar timer/highlight; delta so bai la tin hieu phu de cross-check.
+              </div>
+            </div>
+            <div class="check-item">
+              <span class="mark progress">[~]</span>
+              <div class="check-copy">
+                <strong>Verify va consensus</strong>
+                A la primary, B la escalation; action thuong dung 2/3 frame, transition quan trong dung 3/4.
+              </div>
+            </div>
+            <div class="check-item">
+              <span class="mark progress">[~]</span>
+              <div class="check-copy">
+                <strong>State contract day du hon</strong>
+                Decision engine da co cho bam vao <code>last_played_combo</code>, <code>player_card_counts</code>, <code>turn_owner</code> va <code>buttons</code>.
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="panel">
+          <strong>Chua duoc phep coi la xong</strong>
+          <div class="checklist-list">
+            <div class="check-item">
+              <span class="mark todo">[ ]</span>
+              <div class="check-copy">
+                <strong>Capture production + live preview</strong>
+                Day la cua vao de noi perception va runtime that.
+              </div>
+            </div>
+            <div class="check-item">
+              <span class="mark todo">[ ]</span>
+              <div class="check-copy">
+                <strong>Perception, state extraction, turn owner that</strong>
+                Chua co OCR/YOLO production va parse state thuc su tu frame game.
+              </div>
+            </div>
+            <div class="check-item">
+              <span class="mark todo">[ ]</span>
+              <div class="check-copy">
+                <strong>Action + post-action verify</strong>
+                Chua duoc coi la bot choi that neu chua bam dung va xac minh bang frame moi.
+              </div>
+            </div>
+            <div class="check-item">
+              <span class="mark todo">[ ]</span>
+              <div class="check-copy">
+                <strong>Decision engine va demo end-to-end</strong>
+                Single-bot playable loop va multi-bot supervision van la phan can lam tiep.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="progress-stack">
+        <div class="progress-line">
+          <div class="progress-head">
+            <span>Coordination / docs / handoff</span>
+            <span>Hoan tat de chia viec</span>
+          </div>
+          <div class="progress-track"><div class="progress-fill" style="width: 100%"></div></div>
+        </div>
+        <div class="progress-line">
+          <div class="progress-head">
+            <span>Contracts / tests / roadmap</span>
+            <span>Da chot va verify</span>
+          </div>
+          <div class="progress-track"><div class="progress-fill warm" style="width: 100%"></div></div>
+        </div>
+        <div class="progress-line">
+          <div class="progress-head">
+            <span>Gameplay implementation production</span>
+            <span>Con thieu cac mat xich cot loi</span>
+          </div>
+          <div class="progress-track"><div class="progress-fill danger" style="width: 22%"></div></div>
+        </div>
+      </div>
+      <div class="note" style="margin-top: 16px;">
+        <strong>Doc nhanh nhat:</strong>
+        mo <a href="WORK_COMPLETION_CHECKLIST_VI.md">WORK_COMPLETION_CHECKLIST_VI.md</a> neu can checklist tung muc; mo <a href="FULL_PROJECT_HANDOFF_VI.md">FULL_PROJECT_HANDOFF_VI.md</a> neu can boi canh day du va chi tiet.
+      </div>
+    </section>
     <section id="read-first">
+
       <div class="section-kicker">Onboarding path</div>
       <h2>Mo tai lieu nao truoc</h2>
       <div class="grid cards-3">
         <div class="panel">
           <strong>1. Handoff va board</strong>
           <ul class="clean">
+            <li><a href="WORK_COMPLETION_CHECKLIST_VI.md">WORK_COMPLETION_CHECKLIST_VI.md</a></li>
+            <li><a href="FULL_PROJECT_HANDOFF_VI.md">FULL_PROJECT_HANDOFF_VI.md</a></li>
             <li><a href="docs/AGENT_HANDOFF_VI.md">docs/AGENT_HANDOFF_VI.md</a></li>
             <li><a href="docs/PROJECT_BOARD_VI.md">docs/PROJECT_BOARD_VI.md</a></li>
             <li><a href="docs/GOOGLE_SHEET_TRACKER_VI.md">docs/GOOGLE_SHEET_TRACKER_VI.md</a></li>
@@ -771,7 +995,6 @@
       </div>
       <p style="margin-top: 12px; color: var(--muted);">Du lieu day du hon, bao gom <code>repo_relative_path</code>, <code>original_source_path</code> va danh sach <code>cards_visible</code>, nam trong <a href="tracker/08_Image_Index.csv">tracker/08_Image_Index.csv</a>.</p>
     </section>
-
     <section id="git">
       <div class="section-kicker">Repository status</div>
       <h2>GitHub va repo hien tai</h2>
@@ -779,23 +1002,20 @@
         <div class="panel">
           <strong>Trang thai hien tai</strong>
           <div class="mini-list">
-            <div class="mini-item">GitHub dang o commit <code>bd6b6c6</code> — <em>Add agent handoff bundle, image intake workflow, and API config</em>.</div>
-            <div class="mini-item">Bundle local nay co them <code>index.html</code> de handoff mot file.</div>
-            <div class="mini-item">Neu can chia se qua GitHub, can push tiep sau khi review thay doi moi nay.</div>
+            <div class="mini-item">Remote <code>origin/main</code> da duoc dong bo voi batch moi nhat cua contracts, epics, issue template, checklist va handoff.</div>
+            <div class="mini-item">Ban HTML nay la dashboard doc nhanh; ban Markdown day du nam o <code>FULL_PROJECT_HANDOFF_VI.md</code>.</div>
+            <div class="mini-item">Neu can checklist tung muc de giao agent, mo <code>WORK_COMPLETION_CHECKLIST_VI.md</code>.</div>
             <div class="mini-item"><a href="https://github.com/weijinn97-ai/tienlen-bot">GitHub repo</a></div>
           </div>
         </div>
         <div class="panel">
-          <strong>5 commit gan nhat</strong>
-          <pre>bd6b6c6 (HEAD -> main, origin/main, origin/HEAD) Add agent handoff bundle, image intake workflow, and API config
-74b408e Add detailed build plan tabs to tracker
-82683bd Expand CLAUDE guidelines for project workflow
-465e46c Add public Google Sheet seeding tool
-c87858f Add Google Sheets tracker seed and guide</pre>
+          <strong>Repo snapshot can mo khi can</strong>
+          <pre>git status -sb
+git log --oneline --decorate -5</pre>
+          <div style="margin-top: 10px;">Snapshot bundle tham khao nam trong <code>LOCAL_GIT_STATUS.txt</code> va <code>RECENT_COMMITS.txt</code>.</div>
         </div>
       </div>
     </section>
-
     <section id="validate">
       <div class="section-kicker">Verification</div>
       <h2>Validation gan nhat</h2>
@@ -803,14 +1023,15 @@ c87858f Add Google Sheets tracker seed and guide</pre>
         <div class="panel">
           <strong>Test suite chinh</strong>
           <pre>py -3 -m unittest discover -s tests -v</pre>
-          <div>Ket qua: 18 tests xanh.</div>
+          <div>Ket qua: 25 tests xanh.</div>
         </div>
         <div class="panel">
           <strong>Lane test moi</strong>
-          <pre>tests.test_free_api_agent
+          <pre>tests.test_contract_interfaces
+tests.test_free_api_agent
 tests.test_image_index_export
 tests.test_google_sheet_seed_public</pre>
-          <div>Da cover env-based API config, image index export va sheet seed helper.</div>
+          <div>Da cover contract moi, env-based API config, image index export va sheet seed helper.</div>
         </div>
         <div class="panel">
           <strong>Rui ro con mo</strong>

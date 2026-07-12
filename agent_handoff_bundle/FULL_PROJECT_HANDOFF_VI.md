@@ -1,6 +1,6 @@
 # Full Project Handoff
 
-Cập nhật: 2026-07-04  
+Cập nhật: 2026-07-12  
 Phạm vi: bản Markdown đầy đủ để agent mới có thể nắm kỹ toàn bộ dự án mà không cần tự đi dò nhiều file trước.
 
 ---
@@ -63,32 +63,35 @@ Remote `origin`:
 
 - `https://github.com/weijinn97-ai/tienlen-bot.git`
 
-Commit đã push gần nhất:
-
-- `bd6b6c6`  
-  `Add agent handoff bundle, image intake workflow, and API config`
-
 Branch hiện tại:
 
 - `main`
 
+Tại thời điểm cập nhật file này:
+
+- `origin/main` đã bao gồm batch handoff mới nhất
+- batch đó có `contracts/`, `docs/epics/`, issue template, contract tests, checklist và dashboard HTML
+- agent khác có thể vào GitHub để thấy đúng bức tranh handoff hiện tại
+
+Nếu cần xem 5 commit gần nhất:
+
+- mở `agent_handoff_bundle/RECENT_COMMITS.txt`
+- hoặc chạy `git log --oneline --decorate -5`
+
 ### 3.2. Local
 
-Tại thời điểm xuất file này, local đang có thêm các thay đổi handoff chưa push:
+Bundle local hiện có đầy đủ các file để handoff nhanh:
 
+- `agent_handoff_bundle/WORK_COMPLETION_CHECKLIST_VI.md`
+- `agent_handoff_bundle/FULL_PROJECT_HANDOFF_VI.md`
 - `agent_handoff_bundle/index.html`
-- `agent_handoff_bundle/README.md`
 - `agent_handoff_bundle/LOCAL_GIT_STATUS.txt`
 - `agent_handoff_bundle/RECENT_COMMITS.txt`
-- file này: `agent_handoff_bundle/FULL_PROJECT_HANDOFF_VI.md`
 
-Điều đó có nghĩa:
+Lưu ý:
 
-- GitHub hiện đã có phần lớn bức tranh mới nhất
-- nhưng riêng bundle handoff vẫn còn thêm vài cập nhật local chưa push
-
-Nếu cần agent khác chỉ xem qua file share local thì không sao.  
-Nếu cần GitHub phản ánh đúng file Markdown này, cần push thêm một lần nữa.
+- `LOCAL_GIT_STATUS.txt` và `RECENT_COMMITS.txt` là snapshot phục vụ handoff
+- nếu cần trạng thái thật ngay lúc mở repo, ưu tiên chạy `git status -sb`
 
 ---
 
