@@ -54,13 +54,19 @@ Nói ngắn:
 
 ## Acceptance criteria
 
-- [ ] `ActionPlan` phân biệt được play/pass/wait.
-- [ ] `VerifySpec` có đủ `roi`, `expected_change`, `timeout_ms`, `max_retries`.
-- [ ] Sau action, verify chạy ROI diff trước.
-- [ ] Nếu verify fail sau retries, có escalation parse hand count.
+- [x] `ActionPlan` phân biệt được play/pass/wait.
+- [x] `VerifySpec` có đủ `roi`, `expected_change`, `timeout_ms`, `max_retries`.
+- [x] Sau action, verify chạy ROI diff trước.
+- [x] Nếu verify fail sau retries, có escalation parse hand count.
 - [ ] Nếu cả A và B đều fail thì supervisor nhận lỗi rõ nguyên nhân.
 - [ ] Có single-bot flow đi được từ frame/state đến action có verify.
 - [ ] Có demo session thật ở mức review nội bộ.
+
+## Trạng thái triển khai
+
+- Action ROI mapping, ADB tap sequence, ROI diff và hand-count escalation đã có code/test.
+- Live ADB tap + ROI verification đã pass bằng thao tác Cài đặt an toàn; xem `docs/LIVE_VALIDATION_2026-07-13.md`.
+- Chưa tick playable loop/supervisor vì thiếu card weights và action-button data từ gameplay thật.
 
 ## Dependency
 

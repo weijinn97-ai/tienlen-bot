@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from threading import Event, Lock
 from typing import Callable
 
-from bot.capture.windows_capture import WindowsCapture
+from bot.capture.windows_capture import ViewportSpec, WindowsCapture
 from bot.runtime.schemas import BotBinding, CaptureMode, CaptureSource, FrameEnvelope
 
 
@@ -49,7 +49,16 @@ class CaptureWorker:
     ) -> None:
         self.binding = binding
         self.profile = profile or CaptureProfile()
-        self.capture_backend = capture_backend or WindowsCapture(hwnd=binding.hwnd)
+        viewport_size = binding.metadata.get("viewport_size")
+        viewport = None
+        if viewport_size is not None:
+            if not isinstance(viewport_size, (list, tuple)) or len(viewport_size) != 2:
+                raise ValueError("binding.metadata['viewport_size'] must be [width, height].")
+            viewport = ViewportSpec(int(viewport_size[0]), int(viewport_size[1]))
+        self.capture_backend = capture_backend or WindowsCapture(
+            hwnd=binding.hwnd,
+            viewport=viewport,
+        )
         self.mode = CaptureMode.IDLE
         self.source = getattr(self.capture_backend, "source", CaptureSource.WINDOW_RECT)
         self.latest_frames = LatestFrameBuffer()

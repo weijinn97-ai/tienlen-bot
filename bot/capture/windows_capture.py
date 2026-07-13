@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
@@ -17,8 +18,41 @@ except ImportError:  # pragma: no cover - depends on the Windows runtime environ
 from bot.runtime.schemas import CaptureSource
 
 
+@dataclass(frozen=True)
+class ViewportSpec:
+    width: int
+    height: int
+    anchor: str = "bottom_left"
+
+    def __post_init__(self) -> None:
+        if self.width <= 0 or self.height <= 0:
+            raise ValueError("Viewport dimensions must be positive.")
+        if self.anchor != "bottom_left":
+            raise ValueError("Only the bottom_left viewport anchor is supported.")
+
+    def resolve(self, window_rect: dict[str, int]) -> dict[str, int]:
+        if self.width > window_rect["width"] or self.height > window_rect["height"]:
+            raise RuntimeError("Configured viewport is larger than the captured window.")
+        left = window_rect["left"]
+        top = window_rect["bottom"] - self.height
+        return {
+            "left": left,
+            "top": top,
+            "right": left + self.width,
+            "bottom": window_rect["bottom"],
+            "width": self.width,
+            "height": self.height,
+        }
+
+
 class WindowsCapture:
-    def __init__(self, *, hwnd: int | None = None, window_name: str | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        hwnd: int | None = None,
+        window_name: str | None = None,
+        viewport: ViewportSpec | None = None,
+    ) -> None:
         if mss is None or win32gui is None:
             raise RuntimeError(
                 "WindowsCapture requires the 'mss' and 'pywin32' packages."
@@ -31,6 +65,7 @@ class WindowsCapture:
             raise ValueError("Window handle is invalid or no longer exists.")
 
         self.hwnd = resolved_hwnd
+        self.viewport = viewport
         self.source = CaptureSource.WINDOW_RECT
         self._sct = mss.mss()
 
@@ -86,6 +121,8 @@ class WindowsCapture:
 
     def capture_frame(self) -> np.ndarray:
         rect = self.get_window_rect()
+        if self.viewport is not None:
+            rect = self.viewport.resolve(rect)
         frame = np.array(
             self._sct.grab(
                 {

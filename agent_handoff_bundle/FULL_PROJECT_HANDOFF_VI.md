@@ -611,7 +611,7 @@ py -3 -m unittest discover -s tests -v
 
 Kết quả đã từng xanh:
 
-- `46` tests
+- `59` tests
 
 Những nhóm test đã có:
 

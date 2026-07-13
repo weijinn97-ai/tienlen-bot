@@ -102,3 +102,27 @@ See:
 
 - [data/README.md](/D:/tienlenOPus/tienlen-bot/data/README.md:1)
 - [docs/GOOGLE_SHEET_TRACKER_VI.md](/D:/tienlenOPus/tienlen-bot/docs/GOOGLE_SHEET_TRACKER_VI.md:1)
+
+## Live Capture and Verification
+
+Install the Windows capture runtime:
+
+```bash
+py -3 -m pip install -r requirements-runtime.txt
+```
+
+Run a read-only viewport soak after discovering the MEmu HWND:
+
+```bash
+py -3 tools/run_live_soak.py --hwnd 0x230df2 --duration 30 --fps 8 --viewport 1280x720
+```
+
+The guarded live action smoke tool requires `--confirm-safe-ui` and should only target a UI control known not to spend account resources. See `docs/LIVE_VALIDATION_2026-07-13.md` for the validated VM 203 session.
+
+Card YOLO and OCR dependencies are separate:
+
+```bash
+py -3 -m pip install -r requirements-perception.txt
+```
+
+YOLO activation also requires project-specific weights with exactly 52 unique card classes. Generic pretrained weights are rejected.
