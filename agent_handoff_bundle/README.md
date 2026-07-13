@@ -1,28 +1,30 @@
 # Agent Bundle
 
-Cập nhật: 2026-07-12
+Cập nhật: 2026-07-13
 
 Thư mục này được tạo để gửi nhanh cho agent khác khi cần xem bối cảnh và làm việc tiếp mà không phải tự dò toàn repo.
 
 ## Mở file nào trước
 
 1. `WORK_COMPLETION_CHECKLIST_VI.md`
-2. `FULL_PROJECT_HANDOFF_VI.md`
-3. `index.html`
-4. `docs/AGENT_HANDOFF_VI.md`
-5. `docs/PROJECT_BOARD_VI.md`
-6. `docs/GOOGLE_SHEET_TRACKER_VI.md`
-7. `tracker/00_Overview.csv`
-8. `tracker/01_Task_Board.csv`
-9. `tracker/06_Build_Plan.csv`
-10. `tracker/07_Runtime_Flow.csv`
-11. `tracker/08_Image_Index.csv`
+2. `TRAINING_GUIDE_VI.md` nếu agent làm dữ liệu, YOLO, button hoặc OCR
+3. `FULL_PROJECT_HANDOFF_VI.md`
+4. `index.html`
+5. `docs/AGENT_HANDOFF_VI.md`
+6. `docs/PROJECT_BOARD_VI.md`
+7. `docs/GOOGLE_SHEET_TRACKER_VI.md`
+8. `tracker/00_Overview.csv`
+9. `tracker/01_Task_Board.csv`
+10. `tracker/06_Build_Plan.csv`
+11. `tracker/07_Runtime_Flow.csv`
+12. `tracker/08_Image_Index.csv`
 
 ## Có gì trong đây
 
 - `docs/`: các tài liệu cốt lõi để hiểu dự án, kiến trúc, cấu hình agent và cách dùng sheet
 - `tracker/`: bản CSV của các tab Google Sheet đã seed gần nhất
 - `WORK_COMPLETION_CHECKLIST_VI.md`: checklist dự án rõ Completed / Scaffold / Not finished
+- `TRAINING_GUIDE_VI.md`: quy trình bàn giao train hand/table/button/OCR trên VPS và cổng nghiệm thu production
 - `FULL_PROJECT_HANDOFF_VI.md`: bản Markdown đầy đủ để agent mới nắm kỹ toàn cục
 - `index.html`: dashboard trực quan để nhìn nhanh milestone, checklist, task board, runtime flow và validation
 - `LOCAL_GIT_STATUS.txt`: snapshot `git status` tại thời điểm gom bundle
