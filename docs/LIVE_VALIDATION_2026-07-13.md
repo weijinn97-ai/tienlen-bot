@@ -35,11 +35,37 @@ Kết quả:
 - changed pixel ratio `0.999603`
 - reason `roi_change_confirmed`
 
+## Gameplay thật - phòng 302057
+
+Đã chạy hai action hợp lệ bằng ADB trên VM 203:
+
+1. Chặn `6S` bằng `7S`: selection ROI pass, `PLAY` chuyển enabled, action ROI pass, hand `13 -> 12`.
+2. Lead `3D`: recognizer đọc đúng 12 lá, selection ROI pass, detector xác nhận `PLAY enabled`, action ROI pass, hand `12 -> 11`.
+
+Fixed-layout card fallback được train template từ batch cũ và giữ riêng frame live để test:
+
+- exact slot recall trên hand 13 và 12: `25/25`
+- frame fresh sau action thứ hai đọc đúng toàn bộ 11 lá
+- regression test khóa hand count `13/12/11`
+- button detector khóa transition `PLAY disabled -> enabled -> disabled`
+
+Hai batch gameplay thật:
+
+- `data/submissions/2026-07-13_live_vm203_gameplay`
+- `data/submissions/2026-07-13_live_vm203_gameplay_round2`
+
+## YOLO bootstrap
+
+- Dataset generator tạo `24 train / 6 val / 3 test` từ pseudo boxes.
+- YOLO11n 52-class đã train thử 15 epochs nhưng validation `mAP50=0`.
+- Weight này bị loại và nằm ngoài runtime/Git.
+- Runtime YOLO guard vẫn yêu cầu đúng 52 classes; cần bbox review và thêm dữ liệu trước khi retrain.
+
 ## Chưa được gọi là production gameplay
 
-- Repo chưa có YOLO weight 52 lớp.
-- Ảnh hiện có mới có danh sách 13 lá theo frame, chưa có bbox label để train/evaluate.
-- Chưa có template nút `PLAY/PASS` lấy từ frame đang chơi thật.
-- Chưa chạy soak trong một ván thật vì thao tác vào bàn có thể dùng coin/tài khoản.
+- Chưa có YOLO weight 52 lớp đạt validation.
+- Pseudo bbox hiện chỉ dùng bootstrap, chưa thay thế bbox review thủ công.
+- Fixed-layout fallback chỉ được bảo đảm cho viewport/game layout `1280x720` hiện tại.
+- Chưa có soak dài cả ván với recovery/error injection.
 
 Backend đã có guard để từ chối model sai taxonomy, nhưng không thay thế artifact model và dữ liệu đánh giá thật.

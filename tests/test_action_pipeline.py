@@ -32,6 +32,18 @@ def snapshot() -> PerceptionSnapshot:
     )
 
 
+def snapshot_with_disabled_play() -> PerceptionSnapshot:
+    state = snapshot()
+    return PerceptionSnapshot(
+        bot_id=state.bot_id,
+        frame_id=state.frame_id,
+        frame_ts=state.frame_ts,
+        confidence=state.confidence,
+        cards=state.cards,
+        buttons=(ButtonState(ButtonId.PLAY, "Danh", Rect(1000, 600, 120, 60), is_enabled=False),),
+    )
+
+
 class ActionPipelineTests(unittest.TestCase):
     def test_builds_and_executes_card_then_button_taps(self) -> None:
         state = snapshot()
@@ -56,6 +68,18 @@ class ActionPipelineTests(unittest.TestCase):
                     confidence=0.9,
                 ),
             )
+
+    def test_refreshes_button_state_after_selecting_card(self) -> None:
+        before = snapshot_with_disabled_play()
+        after = snapshot()
+        plan = ActionPlanBuilder().build({"action": "play", "cards": ["3S"]}, before)
+        controller = StubController()
+        ActionTapExecutor(
+            controller,
+            refresh_snapshot=lambda: after,
+            selection_delay_seconds=0,
+        ).execute(plan, before)
+        self.assertEqual(controller.taps, [(130, 650), (1060, 630)])
 
 
 if __name__ == "__main__":

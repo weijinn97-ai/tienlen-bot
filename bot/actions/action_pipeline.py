@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol
+import time
+from typing import Callable, Protocol
 
 from contracts.interfaces import (
     ActionKind,
@@ -48,7 +49,7 @@ class ActionPlanBuilder:
                 for candidate in snapshot.buttons
                 if candidate.button_id == target_button
                 and candidate.is_visible
-                and candidate.is_enabled
+                and (candidate.is_enabled or action == ActionKind.PLAY)
             ),
             None,
         )
@@ -95,8 +96,18 @@ class ExecutedTap:
 
 
 class ActionTapExecutor:
-    def __init__(self, controller: TapController) -> None:
+    def __init__(
+        self,
+        controller: TapController,
+        *,
+        refresh_snapshot: Callable[[], PerceptionSnapshot] | None = None,
+        selection_delay_seconds: float = 0.2,
+        sleep: Callable[[float], None] = time.sleep,
+    ) -> None:
         self.controller = controller
+        self.refresh_snapshot = refresh_snapshot
+        self.selection_delay_seconds = selection_delay_seconds
+        self.sleep = sleep
 
     def execute(self, plan: ActionPlan, snapshot: PerceptionSnapshot) -> tuple[ExecutedTap, ...]:
         if plan.kind == ActionKind.WAIT:
@@ -114,6 +125,9 @@ class ActionTapExecutor:
                 x, y = rect_center(detections[code].roi)
                 self.controller.tap(x, y)
                 taps.append(ExecutedTap(code, x, y))
+            if self.refresh_snapshot is not None:
+                self.sleep(self.selection_delay_seconds)
+                snapshot = self.refresh_snapshot()
         button = next(
             (
                 item

@@ -60,6 +60,23 @@ class ButtonTemplateTests(unittest.TestCase):
         self.assertEqual(result[0].button_id, ButtonId.PLAY)
         self.assertEqual((result[0].roi.x, result[0].roi.y), (140, 60))
 
+    def test_keeps_highest_scoring_state_for_same_button(self) -> None:
+        frame = np.zeros((80, 120, 3), dtype=np.uint8)
+        enabled = np.zeros((10, 20, 3), dtype=np.uint8)
+        enabled[:, ::2] = (0, 255, 0)
+        disabled = enabled.copy()
+        disabled[:, ::2] = (50, 50, 50)
+        frame[50:60, 80:100] = enabled
+        search = NormalizedRect(0.5, 0.5, 0.5, 0.5)
+        result = TemplateButtonDetector(
+            (
+                ButtonTemplate(ButtonId.PLAY, "play", enabled, search, 0.8, True),
+                ButtonTemplate(ButtonId.PLAY, "play", disabled, search, 0.8, False),
+            )
+        ).detect(frame)
+        self.assertEqual(len(result), 1)
+        self.assertTrue(result[0].is_enabled)
+
 
 if __name__ == "__main__":
     unittest.main()

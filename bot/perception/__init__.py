@@ -16,14 +16,21 @@ from bot.perception.table_state import (
     TableStateConsensus,
     TableStateConsensusResult,
 )
-from bot.perception.buttons import ButtonTemplate, TemplateButtonDetector
+from bot.perception.buttons import (
+    ButtonTemplate,
+    TemplateButtonDetector,
+    load_gameplay_button_detector,
+)
 from bot.perception.yolo_cards import YoloCardConfigurationError, YoloCardDetector
 from bot.perception.ocr import OcrConfigurationError, OcrText, TesseractOcr
+from bot.perception.fan_cards import FanCardTemplateRecognizer, FanGeometry
 
 __all__ = [
     "DEFAULT_AVATAR_LAYOUT",
     "AvatarRoiLayout",
     "ButtonTemplate",
+    "FanCardTemplateRecognizer",
+    "FanGeometry",
     "CardCountDelta",
     "HighlightDetection",
     "HybridTurnOwnerDetector",
@@ -40,4 +47,5 @@ __all__ = [
     "YellowHighlightDetector",
     "YoloCardConfigurationError",
     "YoloCardDetector",
+    "load_gameplay_button_detector",
 ]

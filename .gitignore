@@ -2,3 +2,6 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 gcm-diagnose.log
+data/yolo_bootstrap/
+runs/
+*.pt
