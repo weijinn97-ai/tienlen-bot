@@ -1,9 +1,12 @@
 # Full GitHub Handoff - Tien Len Bot
 
-Cập nhật: 2026-07-19  
-Repository: https://github.com/weijinn97-ai/tienlen-bot  
-Branch chính: `main`  
-Baseline khi tạo tài liệu: `09366d1`  
+Cập nhật: 2026-07-19
+
+Repository: https://github.com/weijinn97-ai/tienlen-bot
+
+Branch chính: `main`
+
+Baseline khi tạo tài liệu: `09366d1`
 Roadmap GitHub: https://github.com/weijinn97-ai/tienlen-bot/issues/14
 
 Tài liệu này là bản bàn giao một file dành cho agent mới. Đọc hết file trước khi claim
