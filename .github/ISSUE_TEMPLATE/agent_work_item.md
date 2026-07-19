@@ -16,6 +16,17 @@ One short paragraph that states the problem and the intended outcome.
 - [ ] Child task
 - [ ] Bug
 - [ ] Chore
+- [ ] Module lock candidate
+- [ ] Locked module change
+
+## Module Claim
+
+- Module ID from `.github/module-registry.json`:
+- Current status:
+- Owner / agent:
+- Branch name:
+- Files allowed to change:
+- Public API that must remain compatible:
 
 ## Parent / Related Epic
 
@@ -69,6 +80,8 @@ List the exact symbols or files touched, for example:
 - [ ] The change includes the minimum realistic validation.
 - [ ] Failure modes are explicit and operator-safe.
 - [ ] No unrelated refactor is bundled into this issue.
+- [ ] Module registry and evidence are updated if status/version changes.
+- [ ] No `LOCKED` path is changed without owner approval and required PR label.
 
 Add issue-specific acceptance criteria below:
 
@@ -92,3 +105,9 @@ Commands or manual checks:
 ## Handoff Notes
 
 Anything the next agent must know before continuing.
+
+- Last commit SHA:
+- Exact tests and results:
+- Completed / not completed:
+- Known risks:
+- Exact next command or action:

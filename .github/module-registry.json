@@ -1,0 +1,148 @@
+{
+  "schema_version": 1,
+  "updated": "2026-07-19",
+  "status_flow": ["PLANNED", "IN_PROGRESS", "CANDIDATE", "LOCKED", "DEPRECATED"],
+  "modules": [
+    {
+      "id": "MOD-CONTRACTS",
+      "name": "Shared contracts",
+      "status": "CANDIDATE",
+      "version": "0.1.0",
+      "owner": "@weijinn97-ai",
+      "paths": ["contracts/**"],
+      "public_api": ["contracts.interfaces"],
+      "tests": ["tests/test_contract_interfaces.py"],
+      "evidence": "docs/acceptance/contracts/0.1.0/",
+      "blocked_by": []
+    },
+    {
+      "id": "MOD-DISCOVERY-CAPTURE",
+      "name": "MEmu discovery, binding and capture",
+      "status": "CANDIDATE",
+      "version": "0.1.0",
+      "owner": "@weijinn97-ai",
+      "paths": ["bot/discovery/**", "bot/capture/**", "bot/runtime/schemas.py"],
+      "public_api": ["bot.discovery", "bot.capture", "bot.runtime.schemas"],
+      "tests": ["tests/test_adb_discovery.py", "tests/test_capture_viewport.py"],
+      "evidence": "docs/LIVE_VALIDATION_2026-07-13.md",
+      "blocked_by": ["MOD-CONTRACTS"]
+    },
+    {
+      "id": "MOD-PERCEPTION",
+      "name": "Cards, buttons, OCR and turn perception",
+      "status": "IN_PROGRESS",
+      "version": "0.1.0",
+      "owner": "@weijinn97-ai",
+      "paths": [
+        "bot/perception/__init__.py",
+        "bot/perception/buttons.py",
+        "bot/perception/fan_cards.py",
+        "bot/perception/ocr.py",
+        "bot/perception/turn_owner.py",
+        "bot/perception/yolo_cards.py",
+        "requirements-perception.txt",
+        "data/templates/**"
+      ],
+      "public_api": ["bot.perception"],
+      "tests": ["tests/test_fan_cards.py", "tests/test_live_gameplay_perception.py", "tests/test_model_perception.py", "tests/test_ocr.py", "tests/test_turn_owner.py"],
+      "evidence": "agent_handoff_bundle/TRAINING_GUIDE_VI.md",
+      "blocked_by": ["MOD-CONTRACTS", "MOD-DISCOVERY-CAPTURE"]
+    },
+    {
+      "id": "MOD-STATE",
+      "name": "Typed state extraction and consensus",
+      "status": "CANDIDATE",
+      "version": "0.1.0",
+      "owner": "@weijinn97-ai",
+      "paths": ["bot/perception/table_state.py", "bot/runtime/validation.py", "bot/agent/game_state_adapter.py"],
+      "public_api": ["bot.perception.table_state", "bot.runtime.validation", "bot.agent.game_state_adapter"],
+      "tests": ["tests/test_table_state.py", "tests/test_runtime_validation.py"],
+      "evidence": "docs/LIVE_VALIDATION_2026-07-13.md",
+      "blocked_by": ["MOD-CONTRACTS", "MOD-PERCEPTION"]
+    },
+    {
+      "id": "MOD-RULES-DECISION",
+      "name": "Tien Len rules and decision policy",
+      "status": "IN_PROGRESS",
+      "version": "0.1.0",
+      "owner": "@weijinn97-ai",
+      "paths": [
+        "bot/agent/action_executor.py",
+        "bot/agent/decision_orchestrator.py",
+        "bot/agent/free_api_agent.py",
+        "bot/agent/local_agent.py"
+      ],
+      "public_api": ["bot.agent.decision_orchestrator.DecisionOrchestrator"],
+      "tests": ["tests/test_local_agent.py", "tests/test_free_api_agent.py"],
+      "evidence": "",
+      "blocked_by": ["MOD-CONTRACTS"]
+    },
+    {
+      "id": "MOD-ACTIONS",
+      "name": "Action execution and verification",
+      "status": "CANDIDATE",
+      "version": "0.1.0",
+      "owner": "@weijinn97-ai",
+      "paths": ["bot/actions/**"],
+      "public_api": ["bot.actions"],
+      "tests": ["tests/test_action_pipeline.py", "tests/test_action_verification.py", "tests/test_adb_broker.py"],
+      "evidence": "docs/LIVE_VALIDATION_2026-07-13.md",
+      "blocked_by": ["MOD-CONTRACTS", "MOD-STATE"]
+    },
+    {
+      "id": "MOD-RUNTIME",
+      "name": "Worker, supervisor, inference and recovery",
+      "status": "IN_PROGRESS",
+      "version": "0.1.0",
+      "owner": "@weijinn97-ai",
+      "paths": [
+        "bot/runtime/__init__.py",
+        "bot/runtime/bot_supervisor.py",
+        "bot/runtime/bot_worker.py",
+        "bot/inference/**",
+        "bot/stability/**",
+        "requirements-runtime.txt"
+      ],
+      "public_api": ["bot.runtime", "bot.inference", "bot.stability"],
+      "tests": ["tests/test_bot_worker_typed_state.py", "tests/test_supervisor.py"],
+      "evidence": "",
+      "blocked_by": ["MOD-STATE", "MOD-RULES-DECISION", "MOD-ACTIONS"]
+    },
+    {
+      "id": "MOD-OPERATOR-UI",
+      "name": "Launcher and operator controls",
+      "status": "IN_PROGRESS",
+      "version": "0.1.0",
+      "owner": "@weijinn97-ai",
+      "paths": ["bot/ui/**", "tools/launch_bot_ui.py", "launch_bot_ui.cmd"],
+      "public_api": ["bot.ui"],
+      "tests": [],
+      "evidence": "",
+      "blocked_by": ["MOD-RUNTIME"]
+    },
+    {
+      "id": "MOD-REPLAY",
+      "name": "Replay and observability",
+      "status": "PLANNED",
+      "version": "0.0.0",
+      "owner": "@weijinn97-ai",
+      "paths": ["bot/replay/**", "tools/replay_*.py"],
+      "public_api": ["bot.replay"],
+      "tests": [],
+      "evidence": "",
+      "blocked_by": ["MOD-CONTRACTS", "MOD-STATE"]
+    },
+    {
+      "id": "MOD-MULTIBOT",
+      "name": "Multi-bot production supervision",
+      "status": "PLANNED",
+      "version": "0.0.0",
+      "owner": "@weijinn97-ai",
+      "paths": ["configs/multi_bot_*", "docs/MULTI_BOT_*"],
+      "public_api": [],
+      "tests": [],
+      "evidence": "",
+      "blocked_by": ["MOD-RUNTIME", "MOD-OPERATOR-UI", "MOD-REPLAY"]
+    }
+  ]
+}

@@ -28,6 +28,9 @@ This project targets a Windows-hosted Tien Len bot for MEmu with a multi-bot arc
 
 ## Docs
 
+- [AGENTS.md](AGENTS.md) - mandatory operating guide for agents
+- [docs/MASTER_EXECUTION_PLAN_VI.md](docs/MASTER_EXECUTION_PLAN_VI.md) - full module plan and acceptance gates
+- [docs/GITHUB_REPOSITORY_SETUP_VI.md](docs/GITHUB_REPOSITORY_SETUP_VI.md) - branch protection and module lock setup
 - [docs/MULTI_BOT_ARCHITECTURE.md](/D:/tienlenOPus/tienlen-bot/docs/MULTI_BOT_ARCHITECTURE.md:1)
 - [docs/MULTI_BOT_SETUP_GUIDE.md](/D:/tienlenOPus/tienlen-bot/docs/MULTI_BOT_SETUP_GUIDE.md:1)
 - [docs/PROJECT_BOARD.md](/D:/tienlenOPus/tienlen-bot/docs/PROJECT_BOARD.md:1)

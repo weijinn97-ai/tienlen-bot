@@ -3,6 +3,10 @@
 Cập nhật: 2026-07-13
 Phạm vi: bản Markdown đầy đủ để agent mới có thể nắm kỹ toàn bộ dự án mà không cần tự đi dò nhiều file trước.
 
+> Snapshot này giữ lại bối cảnh đến ngày 2026-07-13. Trạng thái module, thứ tự công việc
+> và gate nghiệm thu mới nhất nằm tại `../AGENTS.md`,
+> `../docs/MASTER_EXECUTION_PLAN_VI.md` và `../.github/module-registry.json`.
+
 ---
 
 ## 1. Mục tiêu của dự án
