@@ -28,6 +28,7 @@ This project targets a Windows-hosted Tien Len bot for MEmu with a multi-bot arc
 
 ## Docs
 
+- [FULL_GITHUB_HANDOFF_VI.md](FULL_GITHUB_HANDOFF_VI.md) - one-file handoff for a new agent
 - [AGENTS.md](AGENTS.md) - mandatory operating guide for agents
 - [docs/MASTER_EXECUTION_PLAN_VI.md](docs/MASTER_EXECUTION_PLAN_VI.md) - full module plan and acceptance gates
 - [docs/GITHUB_REPOSITORY_SETUP_VI.md](docs/GITHUB_REPOSITORY_SETUP_VI.md) - branch protection and module lock setup
