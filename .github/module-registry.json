@@ -31,7 +31,7 @@
       "id": "MOD-PERCEPTION",
       "name": "Cards, buttons, OCR and turn perception",
       "status": "IN_PROGRESS",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "owner": "@weijinn97-ai",
       "paths": [
         "bot/perception/__init__.py",
@@ -45,7 +45,7 @@
       ],
       "public_api": ["bot.perception"],
       "tests": ["tests/test_fan_cards.py", "tests/test_live_gameplay_perception.py", "tests/test_model_perception.py", "tests/test_ocr.py", "tests/test_turn_owner.py"],
-      "evidence": "agent_handoff_bundle/TRAINING_GUIDE_VI.md",
+      "evidence": "docs/acceptance/perception-ui/0.2.0/",
       "blocked_by": ["MOD-CONTRACTS", "MOD-DISCOVERY-CAPTURE"]
     },
     {

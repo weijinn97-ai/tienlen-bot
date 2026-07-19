@@ -6,8 +6,10 @@ from bot.perception.turn_owner import (
     CardCountDelta,
     HighlightDetection,
     HybridTurnOwnerDetector,
+    HybridTurnOwnerConsensus,
     NormalizedRect,
     TurnOwnerDetection,
+    TurnOwnerConsensusResult,
     YellowHighlightDetector,
 )
 from bot.perception.table_state import (
@@ -34,6 +36,7 @@ __all__ = [
     "CardCountDelta",
     "HighlightDetection",
     "HybridTurnOwnerDetector",
+    "HybridTurnOwnerConsensus",
     "NormalizedRect",
     "OcrConfigurationError",
     "OcrText",
@@ -44,6 +47,7 @@ __all__ = [
     "TemplateButtonDetector",
     "TesseractOcr",
     "TurnOwnerDetection",
+    "TurnOwnerConsensusResult",
     "YellowHighlightDetector",
     "YoloCardConfigurationError",
     "YoloCardDetector",
