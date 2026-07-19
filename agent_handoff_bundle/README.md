@@ -10,21 +10,22 @@ Thư mục này được tạo để gửi nhanh cho agent khác khi cần xem b
 
 ## Mở file nào trước
 
-1. `../AGENTS.md`
-2. `../docs/MASTER_EXECUTION_PLAN_VI.md`
-3. `../.github/module-registry.json`
-4. `WORK_COMPLETION_CHECKLIST_VI.md`
-5. `TRAINING_GUIDE_VI.md` nếu agent làm dữ liệu, YOLO, button hoặc OCR
-6. `FULL_PROJECT_HANDOFF_VI.md`
-7. `index.html`
-8. `docs/AGENT_HANDOFF_VI.md`
-9. `docs/PROJECT_BOARD_VI.md`
-10. `docs/GOOGLE_SHEET_TRACKER_VI.md`
-11. `tracker/00_Overview.csv`
-12. `tracker/01_Task_Board.csv`
-13. `tracker/06_Build_Plan.csv`
-14. `tracker/07_Runtime_Flow.csv`
-15. `tracker/08_Image_Index.csv`
+1. `../FULL_GITHUB_HANDOFF_VI.md` nếu cần một file duy nhất
+2. `../AGENTS.md`
+3. `../docs/MASTER_EXECUTION_PLAN_VI.md`
+4. `../.github/module-registry.json`
+5. `WORK_COMPLETION_CHECKLIST_VI.md`
+6. `TRAINING_GUIDE_VI.md` nếu agent làm dữ liệu, YOLO, button hoặc OCR
+7. `FULL_PROJECT_HANDOFF_VI.md`
+8. `index.html`
+9. `docs/AGENT_HANDOFF_VI.md`
+10. `docs/PROJECT_BOARD_VI.md`
+11. `docs/GOOGLE_SHEET_TRACKER_VI.md`
+12. `tracker/00_Overview.csv`
+13. `tracker/01_Task_Board.csv`
+14. `tracker/06_Build_Plan.csv`
+15. `tracker/07_Runtime_Flow.csv`
+16. `tracker/08_Image_Index.csv`
 
 ## Có gì trong đây
 
