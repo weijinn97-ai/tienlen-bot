@@ -14,7 +14,7 @@ Repository: `https://github.com/weijinn97-ai/tienlen-bot`
 Định danh cố định cho task đang mở:
 
 - Clone directory: `tienlen-bot-gemini`
-- Baseline tag: `gemini-data-01-baseline`
+- Baseline tag: `gemini-data-01-baseline-v2`
 - Branch: `agent/gemini-data-01`
 - Output directory: `GEMINI_DATA_01_OUTPUT/`
 - GitHub issue: `#5 DATA-01`

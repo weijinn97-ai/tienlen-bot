@@ -4,7 +4,7 @@
   "task_id": "GEMINI-DATA-01",
   "issue": 5,
   "instruction_file": "gemini_handoff_bundle/tasks/GEMINI_DATA_01_VI.md",
-  "baseline_ref": "gemini-data-01-baseline",
+  "baseline_ref": "gemini-data-01-baseline-v2",
   "required_branch": "agent/gemini-data-01",
   "checkout_directory": "tienlen-bot-gemini",
   "output_directory": "GEMINI_DATA_01_OUTPUT",

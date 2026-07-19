@@ -9,7 +9,7 @@ Xây pipeline kiểm kê dataset production trước train. Không chỉnh logic
 ```powershell
 git clone https://github.com/weijinn97-ai/tienlen-bot.git tienlen-bot-gemini
 cd tienlen-bot-gemini
-git checkout gemini-data-01-baseline
+git checkout gemini-data-01-baseline-v2
 git switch -c agent/gemini-data-01
 py -3 -m unittest discover -s tests -v
 py -3 tools/check_module_governance.py
