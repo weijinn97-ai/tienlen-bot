@@ -1,0 +1,36 @@
+{
+  "task_id": "KIMI-DATA-01",
+  "issue": 5,
+  "baseline_ref": "kimi-data-01-baseline",
+  "checkout_directory": "tienlen-bot-kimi",
+  "branch": "agent/kimi-data-01",
+  "output_directory": "KIMI_DATA_01_OUTPUT",
+  "policy": "deny_by_default",
+  "allowed_new_paths": [
+    "tools/build_dataset_inventory.py",
+    "tests/test_dataset_inventory.py",
+    "data/dataset_inventory/**",
+    "docs/acceptance/dataset/0.1.0/**",
+    "KIMI_DATA_01_OUTPUT/**"
+  ],
+  "allowed_existing_file_modifications": [],
+  "forbidden_paths": [
+    "contracts/**",
+    "bot/**",
+    "configs/**",
+    ".github/**",
+    "data/submissions/**",
+    "data/yolo_bootstrap/**",
+    "data/templates/**",
+    "kimi_handoff_bundle/**"
+  ],
+  "forbidden_operations": [
+    "push_to_main",
+    "force_push",
+    "merge_pull_request",
+    "delete_or_overwrite_raw_data",
+    "change_module_status",
+    "modify_existing_tests",
+    "train_model"
+  ]
+}
