@@ -2,22 +2,29 @@
 
 Cập nhật: 2026-07-13
 
+> Lưu ý 2026-07-19: bundle này là snapshot lịch sử. Khi làm việc trực tiếp trong repo,
+> source of truth mới nhất là `../AGENTS.md`, `../docs/MASTER_EXECUTION_PLAN_VI.md` và
+> `../.github/module-registry.json`. Nếu có mâu thuẫn, ba file đó được ưu tiên.
+
 Thư mục này được tạo để gửi nhanh cho agent khác khi cần xem bối cảnh và làm việc tiếp mà không phải tự dò toàn repo.
 
 ## Mở file nào trước
 
-1. `WORK_COMPLETION_CHECKLIST_VI.md`
-2. `TRAINING_GUIDE_VI.md` nếu agent làm dữ liệu, YOLO, button hoặc OCR
-3. `FULL_PROJECT_HANDOFF_VI.md`
-4. `index.html`
-5. `docs/AGENT_HANDOFF_VI.md`
-6. `docs/PROJECT_BOARD_VI.md`
-7. `docs/GOOGLE_SHEET_TRACKER_VI.md`
-8. `tracker/00_Overview.csv`
-9. `tracker/01_Task_Board.csv`
-10. `tracker/06_Build_Plan.csv`
-11. `tracker/07_Runtime_Flow.csv`
-12. `tracker/08_Image_Index.csv`
+1. `../AGENTS.md`
+2. `../docs/MASTER_EXECUTION_PLAN_VI.md`
+3. `../.github/module-registry.json`
+4. `WORK_COMPLETION_CHECKLIST_VI.md`
+5. `TRAINING_GUIDE_VI.md` nếu agent làm dữ liệu, YOLO, button hoặc OCR
+6. `FULL_PROJECT_HANDOFF_VI.md`
+7. `index.html`
+8. `docs/AGENT_HANDOFF_VI.md`
+9. `docs/PROJECT_BOARD_VI.md`
+10. `docs/GOOGLE_SHEET_TRACKER_VI.md`
+11. `tracker/00_Overview.csv`
+12. `tracker/01_Task_Board.csv`
+13. `tracker/06_Build_Plan.csv`
+14. `tracker/07_Runtime_Flow.csv`
+15. `tracker/08_Image_Index.csv`
 
 ## Có gì trong đây
 
