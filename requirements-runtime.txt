@@ -2,3 +2,4 @@ numpy
 opencv-python
 mss
 pywin32
+requests

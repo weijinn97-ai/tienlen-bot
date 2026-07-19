@@ -100,7 +100,8 @@
         "bot/runtime/bot_supervisor.py",
         "bot/runtime/bot_worker.py",
         "bot/inference/**",
-        "bot/stability/**"
+        "bot/stability/**",
+        "requirements-runtime.txt"
       ],
       "public_api": ["bot.runtime", "bot.inference", "bot.stability"],
       "tests": ["tests/test_bot_worker_typed_state.py", "tests/test_supervisor.py"],
