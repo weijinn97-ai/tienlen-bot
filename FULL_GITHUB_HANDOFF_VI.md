@@ -50,7 +50,7 @@ Xây bot Tiến Lên chạy trên MEmu/Windows với các nguyên tắc:
 - lỗi một bot không làm ảnh hưởng bot khác;
 - module đạt nghiệm thu được version hóa, khóa và tái sử dụng cho bot đời sau.
 
-Dự án **chưa production-ready**. Hiện đã có foundation, live proof nhỏ và 69 unit/regression
+Dự án **chưa production-ready**. Hiện đã có foundation, live proof nhỏ và 80 unit/regression
 tests, nhưng còn thiếu model production, luật đầy đủ, replay, soak dài và end-to-end gate.
 
 ## 3. Source of truth
@@ -131,7 +131,7 @@ Không module nào đang `LOCKED`. Chỉ chủ repo được khóa sau acceptanc
 | `MOD-DISCOVERY-CAPTURE` | CANDIDATE `0.1.0` | Discovery, viewport, 30s live proof | Soak 2 giờ, restart/move/minimize recovery |
 | `MOD-PERCEPTION` | IN_PROGRESS `0.1.0` | Fallback, YOLO guard, button templates, hybrid turn | Production dataset/models, locked replay metrics |
 | `MOD-STATE` | CANDIDATE `0.1.0` | Typed assembly, validation, 2/3 và 3/4 consensus | Production perception input và locked replay |
-| `MOD-RULES-DECISION` | IN_PROGRESS `0.1.0` | Basic local fallback/single response | Luật đầy đủ, legal enumeration, 10k state invariant |
+| `MOD-RULES-DECISION` | CANDIDATE `0.2.0` | Full combo classification, legal enumeration, deterministic fallback | Owner review ma trận chặt/opening trước khi khóa |
 | `MOD-ACTIONS` | CANDIDATE `0.1.0` | Two-stage selection/action path, two live actions | 100 supervised actions và failure matrix |
 | `MOD-RUNTIME` | IN_PROGRESS `0.1.0` | Worker/supervisor/watchdog scaffold | Full state machine, recovery, replay integration |
 | `MOD-OPERATOR-UI` | IN_PROGRESS `0.1.0` | Launcher/start-stop/log | Preview, panic/recovery UX và tests |
@@ -140,7 +140,7 @@ Không module nào đang `LOCKED`. Chỉ chủ repo được khóa sau acceptanc
 
 ## 8. Những gì đã xác minh
 
-- Full local suite hiện có `69` tests pass.
+- Full local suite hiện có `80` tests pass.
 - GitHub Actions `unit-and-governance` đang xanh trên `main`.
 - VM 203 từng capture 239 frames/30 giây, 1280x720, 0 errors, p95 43.064 ms.
 - Safe-UI ADB tap và ROI verification đã pass.
@@ -149,6 +149,7 @@ Không module nào đang `LOCKED`. Chỉ chủ repo được khóa sau acceptanc
 - Hybrid turn detector chỉ chốt khi highlight và count delta đồng thuận.
 - YOLO adapter từ chối weight sai 52-class taxonomy.
 - Bootstrap YOLO cũ có `mAP50=0` và đã bị loại, không được dùng production.
+- Rules candidate classify/compare/enumerate đủ combo và có 0 invalid PLAY trên 10.000 state test.
 
 Evidence hiện có: `docs/LIVE_VALIDATION_2026-07-13.md`.
 
@@ -156,7 +157,7 @@ Evidence hiện có: `docs/LIVE_VALIDATION_2026-07-13.md`.
 
 - Chưa có production 52-class weights đạt locked test.
 - Chưa có dataset bbox đủ coverage/QA và split chống leakage.
-- Chưa có complete Tien Len rules/legal move engine.
+- Rules engine chưa `LOCKED`: cần owner xác nhận ma trận chặt và opening/out-of-turn policy.
 - Chưa có deterministic replay module.
 - Chưa nối production card/button/OCR vào full typed state liên tục.
 - Chưa có production state machine/recovery end-to-end.
