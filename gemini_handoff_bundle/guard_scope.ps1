@@ -59,6 +59,12 @@ $nameStatus = @(git diff --name-status $policy.baseline_ref --)
 $untracked = @(git ls-files --others --exclude-standard)
 $changes = @{}
 $violations = @()
+$baselineFiles = [System.Collections.Generic.HashSet[string]]::new(
+    [System.StringComparer]::Ordinal
+)
+foreach ($baselinePath in @(git ls-tree -r --name-only $policy.baseline_ref --)) {
+    [void]$baselineFiles.Add($baselinePath.Replace('\', '/'))
+}
 
 foreach ($line in $nameStatus) {
     if (-not $line) { continue }
@@ -76,8 +82,7 @@ foreach ($path in $untracked) {
 }
 
 foreach ($path in $changes.Keys) {
-    git cat-file -e "$($policy.baseline_ref):$path" 2>$null
-    $existedAtBaseline = $LASTEXITCODE -eq 0
+    $existedAtBaseline = $baselineFiles.Contains($path)
     if ($existedAtBaseline) {
         if (-not (Matches-Any $path $policy.allowed_existing_file_modifications)) {
             $violations += "Existing file modification is forbidden: $path"
