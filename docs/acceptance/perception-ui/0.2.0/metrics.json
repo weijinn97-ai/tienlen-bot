@@ -1,0 +1,12 @@
+{
+  "status": "IN_PROGRESS",
+  "full_tests_passed": 84,
+  "full_tests_failed": 0,
+  "ocr_tests_passed": 4,
+  "turn_owner_tests_passed": 10,
+  "committed_button_transition_frames": 3,
+  "required_negative_button_frames": 2000,
+  "production_button_gate_met": false,
+  "production_ocr_gate_met": false,
+  "locked_turn_replay_gate_met": false
+}

@@ -7,6 +7,7 @@ import numpy as np
 from bot.perception.turn_owner import (
     DEFAULT_AVATAR_LAYOUT,
     HybridTurnOwnerDetector,
+    HybridTurnOwnerConsensus,
     NormalizedRect,
     YellowHighlightDetector,
 )
@@ -101,6 +102,51 @@ class HybridTurnOwnerDetectorTests(unittest.TestCase):
         self.assertIsNone(result.turn_owner)
         self.assertIsNotNone(result.evidence)
         self.assertFalse(result.evidence.signals_agree)
+
+    def test_critical_consensus_requires_three_of_four_and_latest(self) -> None:
+        frame = cv2.imread(str(SAMPLE_DIR / "2.png"))
+        current = dict(self.previous)
+        current[SeatPosition.RIGHT] = 12
+        agreed = self.detector.detect(
+            frame,
+            previous_card_counts=self.previous,
+            current_card_counts=current,
+        )
+        conflict_counts = dict(self.previous)
+        conflict_counts[SeatPosition.SELF] = 12
+        conflict = self.detector.detect(
+            frame,
+            previous_card_counts=self.previous,
+            current_card_counts=conflict_counts,
+        )
+        consensus = HybridTurnOwnerConsensus()
+
+        self.assertIsNone(consensus.observe("bot-1", agreed).turn_owner)
+        self.assertIsNone(consensus.observe("bot-1", agreed).turn_owner)
+        committed = consensus.observe("bot-1", agreed)
+        self.assertEqual(committed.turn_owner, SeatPosition.SELF)
+        self.assertEqual(committed.matching_frames, 3)
+
+        # Even with three matching historical frames, a conflicting latest frame revokes turn.
+        revoked = consensus.observe("bot-1", conflict)
+        self.assertIsNone(revoked.turn_owner)
+        self.assertEqual(revoked.matching_frames, 0)
+
+    def test_critical_consensus_is_isolated_by_bot_id(self) -> None:
+        frame = cv2.imread(str(SAMPLE_DIR / "2.png"))
+        current = dict(self.previous)
+        current[SeatPosition.RIGHT] = 12
+        agreed = self.detector.detect(
+            frame,
+            previous_card_counts=self.previous,
+            current_card_counts=current,
+        )
+        consensus = HybridTurnOwnerConsensus()
+        consensus.observe("bot-1", agreed)
+        consensus.observe("bot-1", agreed)
+
+        self.assertIsNone(consensus.observe("bot-2", agreed).turn_owner)
+        self.assertEqual(consensus.observe("bot-1", agreed).turn_owner, SeatPosition.SELF)
 
 
 if __name__ == "__main__":

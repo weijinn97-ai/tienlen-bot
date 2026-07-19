@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import defaultdict, deque
 from dataclasses import dataclass
 from typing import Mapping, Sequence
 
@@ -163,6 +164,55 @@ class TurnOwnerDetection:
     evidence: TurnOwnerEvidence | None
     primary: HighlightDetection
     secondary: CardCountDelta
+
+
+@dataclass(frozen=True)
+class TurnOwnerConsensusResult:
+    turn_owner: SeatPosition | None
+    observed_frames: int
+    matching_frames: int
+    required_matches: int
+
+
+class HybridTurnOwnerConsensus:
+    """Commit a hybrid turn signal only after 3/4 agreement including latest."""
+
+    def __init__(self, *, history_size: int = 4, required_matches: int = 3) -> None:
+        if history_size < 1:
+            raise ValueError("history_size must be positive.")
+        if required_matches < 1 or required_matches > history_size:
+            raise ValueError("required_matches must be within history_size.")
+        self.history_size = history_size
+        self.required_matches = required_matches
+        self._history: dict[str, deque[SeatPosition | None]] = defaultdict(
+            lambda: deque(maxlen=history_size)
+        )
+
+    def observe(
+        self,
+        bot_id: str,
+        detection: TurnOwnerDetection,
+    ) -> TurnOwnerConsensusResult:
+        if not bot_id.strip():
+            raise ValueError("bot_id must not be empty.")
+        owner = detection.turn_owner
+        history = self._history[bot_id]
+        history.append(owner)
+        matches = (
+            sum(observed == owner for observed in history)
+            if owner is not None
+            else 0
+        )
+        committed = owner if matches >= self.required_matches else None
+        return TurnOwnerConsensusResult(
+            turn_owner=committed,
+            observed_frames=len(history),
+            matching_frames=matches,
+            required_matches=self.required_matches,
+        )
+
+    def reset(self, bot_id: str) -> None:
+        self._history.pop(bot_id, None)
 
 
 class HybridTurnOwnerDetector:

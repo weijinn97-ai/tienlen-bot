@@ -50,7 +50,7 @@ Xây bot Tiến Lên chạy trên MEmu/Windows với các nguyên tắc:
 - lỗi một bot không làm ảnh hưởng bot khác;
 - module đạt nghiệm thu được version hóa, khóa và tái sử dụng cho bot đời sau.
 
-Dự án **chưa production-ready**. Hiện đã có foundation, live proof nhỏ và 80 unit/regression
+Dự án **chưa production-ready**. Hiện đã có foundation, live proof nhỏ và 84 unit/regression
 tests, nhưng còn thiếu model production, luật đầy đủ, replay, soak dài và end-to-end gate.
 
 ## 3. Source of truth
@@ -129,7 +129,7 @@ Không module nào đang `LOCKED`. Chỉ chủ repo được khóa sau acceptanc
 |---|---|---|---|
 | `MOD-CONTRACTS` | CANDIDATE `0.1.0` | Typed contracts và tests | Serialization/compatibility fixtures, owner API review |
 | `MOD-DISCOVERY-CAPTURE` | CANDIDATE `0.1.0` | Discovery, viewport, 30s live proof | Soak 2 giờ, restart/move/minimize recovery |
-| `MOD-PERCEPTION` | IN_PROGRESS `0.1.0` | Fallback, YOLO guard, button templates, hybrid turn | Production dataset/models, locked replay metrics |
+| `MOD-PERCEPTION` | IN_PROGRESS `0.2.0` | Fallback, YOLO guard, button templates, confidence-aware OCR, hybrid turn 3/4 | Production dataset/models, 2.000 negative frames, locked replay metrics |
 | `MOD-STATE` | CANDIDATE `0.1.0` | Typed assembly, validation, 2/3 và 3/4 consensus | Production perception input và locked replay |
 | `MOD-RULES-DECISION` | CANDIDATE `0.2.0` | Full combo classification, legal enumeration, deterministic fallback | Owner review ma trận chặt/opening trước khi khóa |
 | `MOD-ACTIONS` | CANDIDATE `0.1.0` | Two-stage selection/action path, two live actions | 100 supervised actions và failure matrix |
@@ -140,13 +140,14 @@ Không module nào đang `LOCKED`. Chỉ chủ repo được khóa sau acceptanc
 
 ## 8. Những gì đã xác minh
 
-- Full local suite hiện có `80` tests pass.
+- Full local suite hiện có `84` tests pass.
 - GitHub Actions `unit-and-governance` đang xanh trên `main`.
 - VM 203 từng capture 239 frames/30 giây, 1280x720, 0 errors, p95 43.064 ms.
 - Safe-UI ADB tap và ROI verification đã pass.
 - Hai gameplay actions thật đã thực hiện có giám sát: `7S` và `3D`.
 - Fixed-layout fallback đọc đúng các regression hands 13/12/11 trong sample hiện có.
-- Hybrid turn detector chỉ chốt khi highlight và count delta đồng thuận.
+- Hybrid turn detector chỉ chốt khi highlight và count delta đồng thuận; critical transition cần 3/4 frame và frame cuối phải khớp.
+- OCR confidence thấp trả `UNKNOWN`; production accuracy chưa được công nhận vì thiếu bộ ground truth khóa.
 - YOLO adapter từ chối weight sai 52-class taxonomy.
 - Bootstrap YOLO cũ có `mAP50=0` và đã bị loại, không được dùng production.
 - Rules candidate classify/compare/enumerate đủ combo và có 0 invalid PLAY trên 10.000 state test.

@@ -1,0 +1,6 @@
+py -3 -m unittest discover -s tests -p "test_ocr.py" -v
+py -3 -m unittest discover -s tests -p "test_turn_owner.py" -v
+py -3 -m unittest discover -s tests
+py -3 -m compileall -q bot contracts tools
+py -3 tools/check_module_governance.py
+git diff --check
