@@ -1,5 +1,9 @@
 # Kimi Handoff Bundle
 
+> DEPRECATED: Kimi đã ngừng được sử dụng cho dự án. Không giao task mới từ thư mục này.
+> Agent Google Gemini phải đọc `gemini_handoff_bundle/README.md` và chỉ làm task trong
+> `gemini_handoff_bundle/ACTIVE_TASK.json`.
+
 Gửi nguyên thư mục này cho Kimi cùng link repo:
 
 `https://github.com/weijinn97-ai/tienlen-bot`

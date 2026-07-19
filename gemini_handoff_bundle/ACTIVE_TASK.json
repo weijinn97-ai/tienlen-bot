@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "agent": "Google Gemini",
+  "task_id": "GEMINI-DATA-01",
+  "issue": 5,
+  "instruction_file": "gemini_handoff_bundle/tasks/GEMINI_DATA_01_VI.md",
+  "baseline_ref": "gemini-data-01-baseline",
+  "required_branch": "agent/gemini-data-01",
+  "checkout_directory": "tienlen-bot-gemini",
+  "output_directory": "GEMINI_DATA_01_OUTPUT",
+  "status": "ACTIVE",
+  "policy": "deny_by_default",
+  "allowed_new_paths": [
+    "tools/build_dataset_inventory.py",
+    "tests/test_dataset_inventory.py",
+    "data/dataset_inventory/**",
+    "docs/acceptance/dataset/0.1.0/**",
+    "GEMINI_DATA_01_OUTPUT/**"
+  ],
+  "allowed_existing_file_modifications": [],
+  "forbidden_operations": [
+    "push_or_commit_to_main",
+    "force_push",
+    "merge_pull_request",
+    "git_reset_hard",
+    "git_clean",
+    "delete_or_rename_files",
+    "overwrite_raw_data",
+    "modify_existing_tests",
+    "change_contracts",
+    "change_module_status",
+    "install_new_dependencies",
+    "train_model",
+    "start_next_task_without_new_active_policy"
+  ]
+}
