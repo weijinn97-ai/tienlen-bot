@@ -1,0 +1,13 @@
+{
+  "candidate_version": "0.2.0",
+  "full_suite_tests": 80,
+  "full_suite_failures": 0,
+  "rules_tests": 11,
+  "generated_states": 10000,
+  "invalid_play_outputs": 0,
+  "benchmark_runs": 500,
+  "benchmark_hand_size": 13,
+  "benchmark_combo_count": 206,
+  "enumeration_mean_ms": 4.226,
+  "enumeration_worst_batch_mean_ms": 4.322
+}

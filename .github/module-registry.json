@@ -63,18 +63,19 @@
     {
       "id": "MOD-RULES-DECISION",
       "name": "Tien Len rules and decision policy",
-      "status": "IN_PROGRESS",
-      "version": "0.1.0",
+      "status": "CANDIDATE",
+      "version": "0.2.0",
       "owner": "@weijinn97-ai",
       "paths": [
+        "bot/rules/**",
         "bot/agent/action_executor.py",
         "bot/agent/decision_orchestrator.py",
         "bot/agent/free_api_agent.py",
         "bot/agent/local_agent.py"
       ],
-      "public_api": ["bot.agent.decision_orchestrator.DecisionOrchestrator"],
-      "tests": ["tests/test_local_agent.py", "tests/test_free_api_agent.py"],
-      "evidence": "",
+      "public_api": ["bot.rules", "bot.agent.decision_orchestrator.DecisionOrchestrator"],
+      "tests": ["tests/test_tien_len_rules.py", "tests/test_local_agent.py", "tests/test_free_api_agent.py"],
+      "evidence": "docs/acceptance/rules-decision/0.2.0/",
       "blocked_by": ["MOD-CONTRACTS"]
     },
     {

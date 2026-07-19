@@ -1,0 +1,5 @@
+py -3 -m unittest discover -s tests -p "test_tien_len_rules.py" -v
+py -3 -m unittest discover -s tests
+py -3 -m compileall -q bot contracts tools
+py -3 tools/check_module_governance.py
+py -3 -c "from timeit import repeat; from bot.rules import enumerate_legal_moves; h=('3S','3H','4S','4H','5S','5H','6S','6H','7D','8D','9D','10D','JD'); x=repeat(lambda: enumerate_legal_moves(h), number=100, repeat=5); print(sum(x)/len(x)/100*1000); print(len(enumerate_legal_moves(h)))"
