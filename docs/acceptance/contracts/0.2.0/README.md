@@ -1,4 +1,4 @@
-# Acceptance Evidence – contracts 0.2.0 CANDIDATE
+# Acceptance Evidence – contracts 0.2.0 CANDIDATE (Repair PR #26)
 
 ## Environment
 
@@ -10,16 +10,16 @@
 
 ## Scope
 
-Added stable serialization and compatibility fixtures for contracts module.
-No changes to `contracts/interfaces.py`, card encoding, or existing semantics.
+Added stable serialization, strict wire-boundary validation, and compatibility fixtures for contracts module.
+No changes to `contracts/interfaces.py`, card encoding, or existing contract semantics.
 
 ## Files Changed
 
 | File | Action |
 |------|--------|
-| `contracts/serialization.py` | NEW |
-| `contracts/__init__.py` | MODIFIED (export serialization API) |
-| `tests/test_contract_serialization.py` | NEW |
+| `contracts/serialization.py` | MODIFIED (Strict wire validation) |
+| `contracts/__init__.py` | MODIFIED (Export public serialization API) |
+| `tests/test_contract_serialization.py` | MODIFIED (60 serialization & wire validation tests) |
 | `tests/fixtures/contracts_v1/perception_snapshot_full.json` | NEW |
 | `tests/fixtures/contracts_v1/table_state_full.json` | NEW |
 | `tests/fixtures/contracts_v1/action_plan_play.json` | NEW |
@@ -28,12 +28,16 @@ No changes to `contracts/interfaces.py`, card encoding, or existing semantics.
 ## Test Results
 
 - **Baseline tests**: 110/110 OK
-- **New serialization tests**: 51/51 OK
-- **Total tests**: 161/161 OK
+- **Serialization & Strict Wire Validation tests**: 60/60 OK
+- **Total tests**: 170/170 OK
 - **Compile check**: `py -3 -m compileall -q bot contracts tools` – clean
 - **Governance check**: `py -3 tools/check_module_governance.py` – passed
 - **Scope guard**: `gemini_handoff_bundle/guard_scope.ps1` – passed
 - **Whitespace**: `git diff --check` – clean
+
+## Checksums Method
+
+Checksums in `artifacts.sha256` are calculated from normalized LF line-endings (`open(f, 'rb').read().replace(b'\r\n', b'\n')`) to eliminate OS-dependent checkout differences.
 
 ## Conclusion
 

@@ -611,6 +611,159 @@ class InvalidValueTests(unittest.TestCase):
 
 
 # -----------------------------------------------------------------------
+# Mandatory strict wire validation regression tests (Repair Spec Section 4)
+# -----------------------------------------------------------------------
+
+
+class StrictWireValidationTests(unittest.TestCase):
+    """Regression tests required by repair spec Section 4."""
+
+    def test_json_non_finite_constants_rejected(self) -> None:
+        """JSON NaN, Infinity, -Infinity are rejected during contract_from_json."""
+        nan_json = '{"schema_version": 1, "contract_type": "Rect", "payload": {"x": NaN, "y": 0, "width": 10, "height": 10}}'
+        inf_json = '{"schema_version": 1, "contract_type": "Rect", "payload": {"x": Infinity, "y": 0, "width": 10, "height": 10}}'
+        neginf_json = '{"schema_version": 1, "contract_type": "Rect", "payload": {"x": -Infinity, "y": 0, "width": 10, "height": 10}}'
+        for document in (nan_json, inf_json, neginf_json):
+            with self.subTest(doc=document):
+                with self.assertRaises((ValueError, json.JSONDecodeError)):
+                    contract_from_json(document)
+
+    def test_direct_dict_non_finite_floats_rejected(self) -> None:
+        """Direct dict float('nan'), float('inf'), float('-inf') in confidence are rejected."""
+        base_payload = {
+            "schema_version": CONTRACT_SCHEMA_VERSION,
+            "contract_type": "DetectedCard",
+            "payload": {
+                "code": "3S",
+                "roi": {"x": 0, "y": 0, "width": 10, "height": 10},
+                "zone": "my_hand",
+                "confidence": 0.95,
+                "seat": None,
+            },
+        }
+        for bad_val in (float("nan"), float("inf"), float("-inf")):
+            with self.subTest(val=bad_val):
+                envelope = json.loads(json.dumps(base_payload))
+                envelope["payload"]["confidence"] = bad_val
+                with self.assertRaises(ValueError):
+                    contract_from_dict(envelope)
+
+    def test_schema_version_boolean_rejected(self) -> None:
+        """schema_version=True must raise TypeError."""
+        envelope = {
+            "schema_version": True,
+            "contract_type": "Rect",
+            "payload": {"x": 0, "y": 0, "width": 10, "height": 10},
+        }
+        with self.assertRaises(TypeError):
+            contract_from_dict(envelope)
+
+    def test_card_count_boolean_rejected(self) -> None:
+        """player_card_counts value of True must raise TypeError."""
+        ts_env = contract_to_dict(_sample_table_state())
+        ts_env["payload"]["player_card_counts"]["0"] = True
+        with self.assertRaises(TypeError):
+            contract_from_dict(ts_env)
+
+    def test_player_card_counts_seat_keys(self) -> None:
+        """Seat keys like '00', unknown key, or non-str are rejected."""
+        ts_env = contract_to_dict(_sample_table_state())
+        # '00' key
+        ts_env1 = json.loads(json.dumps(ts_env))
+        ts_env1["payload"]["player_card_counts"] = {"00": 5}
+        with self.assertRaises(ValueError):
+            contract_from_dict(ts_env1)
+        # unknown key '4'
+        ts_env2 = json.loads(json.dumps(ts_env))
+        ts_env2["payload"]["player_card_counts"] = {"4": 5}
+        with self.assertRaises(ValueError):
+            contract_from_dict(ts_env2)
+
+    def test_button_id_invalid_types_rejected(self) -> None:
+        """ButtonState.button_id of object/list/numeric/bool is rejected."""
+        bs_env = contract_to_dict(_sample_button_state())
+        for bad_id in ({"a": 1}, [1, 2], 123, True):
+            with self.subTest(bad_id=bad_id):
+                env = json.loads(json.dumps(bs_env)) if not isinstance(bad_id, (dict, list)) else dict(bs_env)
+                env["payload"] = dict(env["payload"])
+                env["payload"]["button_id"] = bad_id
+                with self.assertRaises(TypeError):
+                    contract_from_dict(env)
+
+    def test_target_button_invalid_types_rejected(self) -> None:
+        """ActionPlan.target_button of object/list/numeric/bool is rejected."""
+        ap_env = contract_to_dict(_sample_action_plan_play())
+        for bad_tb in ({"a": 1}, [1, 2], 123, True):
+            with self.subTest(bad_tb=bad_tb):
+                env = dict(ap_env)
+                env["payload"] = dict(env["payload"])
+                env["payload"]["target_button"] = bad_tb
+                with self.assertRaises(TypeError):
+                    contract_from_dict(env)
+
+    def test_boolean_in_integer_fields_rejected(self) -> None:
+        """Bool in frame_ts, Rect integer fields, timeout/retry, consensus counts is rejected."""
+        rect_env = contract_to_dict(_sample_rect())
+        rect_env["payload"]["x"] = True
+        with self.assertRaises(TypeError):
+            contract_from_dict(rect_env)
+
+        ts_env = contract_to_dict(_sample_table_state())
+        ts_env["payload"]["frame_ts"] = True
+        with self.assertRaises(TypeError):
+            contract_from_dict(ts_env)
+
+        vs_env = contract_to_dict(_sample_verify_spec())
+        vs_env["payload"]["timeout_ms"] = True
+        with self.assertRaises(TypeError):
+            contract_from_dict(vs_env)
+
+        vs_env2 = contract_to_dict(_sample_verify_spec())
+        vs_env2["payload"]["max_retries"] = True
+        with self.assertRaises(TypeError):
+            contract_from_dict(vs_env2)
+
+        cs_env = contract_to_dict(_sample_consensus_spec())
+        cs_env["payload"]["history_size"] = True
+        with self.assertRaises(TypeError):
+            contract_from_dict(cs_env)
+
+    def test_wrong_container_types_rejected(self) -> None:
+        """Wrong container types for cards, ROI, buttons, and player_card_counts raise TypeError."""
+        ts_env = contract_to_dict(_sample_table_state())
+        # cards as string
+        env1 = dict(ts_env)
+        env1["payload"] = dict(env1["payload"])
+        env1["payload"]["my_cards"] = "3S,4S"
+        with self.assertRaises(TypeError):
+            contract_from_dict(env1)
+
+        # ROI as list
+        env2 = dict(ts_env)
+        env2["payload"] = dict(env2["payload"])
+        env2["payload"]["buttons"] = [{
+            "button_id": "play", "label": "Play", "roi": [10, 20, 30, 40],
+            "is_visible": True, "is_enabled": True, "confidence": 0.9
+        }]
+        with self.assertRaises(TypeError):
+            contract_from_dict(env2)
+
+        # buttons as string
+        env3 = dict(ts_env)
+        env3["payload"] = dict(env3["payload"])
+        env3["payload"]["buttons"] = "play"
+        with self.assertRaises(TypeError):
+            contract_from_dict(env3)
+
+        # player_card_counts as list
+        env4 = dict(ts_env)
+        env4["payload"] = dict(env4["payload"])
+        env4["payload"]["player_card_counts"] = [10, 8]
+        with self.assertRaises(TypeError):
+            contract_from_dict(env4)
+
+
+# -----------------------------------------------------------------------
 # Consumer smoke tests
 # -----------------------------------------------------------------------
 
