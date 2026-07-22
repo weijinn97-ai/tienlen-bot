@@ -19,6 +19,10 @@ Repository: `https://github.com/weijinn97-ai/tienlen-bot`
 - Output directory: `GEMINI_DATA_01_OUTPUT/`
 - GitHub issue: `#5 DATA-01`
 
+## Trạng thái hiện tại
+
+`GEMINI-DATA-01` đã merge tại `d424709` và đang `BLOCKED_ON_DATA`. Không chạy lại task hoặc train model cho tới khi chủ repo cung cấp dữ liệu/annotation mới và phát hành policy `ACTIVE` mới.
+
 ## Nguyên tắc quan trọng nhất
 
 Gemini không được tự chạy toàn bộ master plan trong một branch. Chỉ `ACTIVE_TASK.json` cấp quyền. Sau mỗi PR, chủ repo/Codex review và phát hành baseline/active task mới. Task catalog chỉ là roadmap, không phải quyền chỉnh sửa.
