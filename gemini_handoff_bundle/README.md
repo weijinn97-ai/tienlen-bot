@@ -14,14 +14,14 @@ Repository: `https://github.com/weijinn97-ai/tienlen-bot`
 Định danh cố định cho task đang mở:
 
 - Clone directory: `tienlen-bot-gemini`
-- Baseline tag: `gemini-data-01-baseline-v2`
-- Branch: `agent/gemini-data-01`
-- Output directory: `GEMINI_DATA_01_OUTPUT/`
-- GitHub issue: `#5 DATA-01`
+- Baseline tag: `gemini-contract-01-baseline`
+- Branch: `agent/gemini-contract-01`
+- Output directory: `GEMINI_CONTRACT_01_OUTPUT/`
+- GitHub issue: `#2 CONTRACT-01`
 
 ## Trạng thái hiện tại
 
-`GEMINI-DATA-01` đã merge tại `d424709` và đang `BLOCKED_ON_DATA`. Không chạy lại task hoặc train model cho tới khi chủ repo cung cấp dữ liệu/annotation mới và phát hành policy `ACTIVE` mới.
+`GEMINI-CONTRACT-01` đang `ACTIVE`. Chỉ triển khai serialization/compatibility trong whitelist; không sửa `contracts/interfaces.py` hoặc semantics hiện hữu.
 
 ## Nguyên tắc quan trọng nhất
 
