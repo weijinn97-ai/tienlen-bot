@@ -1,0 +1,15 @@
+{
+  "baseline_commit": "27caa12eec211041e84e4ea53844fcab443d0cf3",
+  "command": "tools/build_dataset_inventory.py",
+  "generated_at_utc": "2026-07-13T00:52:17.955675+00:00",
+  "input_count": 36,
+  "phash_threshold": 6,
+  "report_sha256": {
+    "annotation_review.csv": "bfccda849c2f94ee9d4a8f32b7936ada471e203d6281bc4a84776a8b5203d74d",
+    "coverage_report.json": "2326d8798318d35f60e3fc61d07a7d5589d3988953a7355d7e7b94a508e216ce",
+    "duplicate_groups.csv": "2899e2550b52ec00a3b8cbea6da84c74294c615f23e13543efca41fa886215ea",
+    "inventory.csv": "65ba73737c4f77c174a609fe9bdce1d6d1f005f75844af2bad7164c555adb903",
+    "split_manifest.csv": "05890fccb45898163f4a9ca3b7e7cc98efd2f7e8df4663bf5c5a30d607f9caa2"
+  },
+  "seed": 17
+}

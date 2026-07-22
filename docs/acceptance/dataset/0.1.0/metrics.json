@@ -1,0 +1,20 @@
+{
+  "status": "BLOCKED_ON_DATA",
+  "full_tests_passed": 98,
+  "full_tests_failed": 0,
+  "dataset_inventory_tests_passed": 14,
+  "input_images": 36,
+  "valid_images": 36,
+  "corrupt_images": 0,
+  "exact_duplicate_groups": 0,
+  "near_duplicate_components": 1,
+  "leakage_violations": 0,
+  "train_images": 36,
+  "val_images": 0,
+  "test_images": 0,
+  "production_annotations_present": 0,
+  "production_annotations_missing": 36,
+  "unknown_match_ids": 36,
+  "button_hard_negative_deficit": 2000,
+  "training_authorized": false
+}

@@ -1,0 +1,7 @@
+py -3 -m unittest discover -s tests -p "test_dataset_inventory.py" -v
+py -3 tools/build_dataset_inventory.py --repo-root . --output data/dataset_inventory
+py -3 -m unittest discover -s tests
+py -3 -m compileall -q bot contracts tools
+py -3 tools/check_module_governance.py
+powershell -ExecutionPolicy Bypass -File gemini_handoff_bundle/guard_scope.ps1
+git diff --check
