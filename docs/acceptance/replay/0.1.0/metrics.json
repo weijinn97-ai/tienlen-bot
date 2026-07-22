@@ -1,0 +1,14 @@
+{
+  "status": "CANDIDATE",
+  "schema_version": 1,
+  "replay_tests_passed": 12,
+  "full_tests_passed": 110,
+  "full_tests_failed": 0,
+  "fixed_fixture_events": 2,
+  "table_state_round_trip": true,
+  "decision_reproduction": true,
+  "bundle_checksum_validation": true,
+  "event_hash_chain_validation": true,
+  "redaction_validation": true,
+  "live_runtime_integration": false
+}
