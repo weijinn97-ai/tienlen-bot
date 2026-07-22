@@ -1,0 +1,27 @@
+{
+  "module": "MOD-CONTRACTS",
+  "proposed_version": "0.2.0",
+  "status": "CANDIDATE",
+  "baseline_ref": "gemini-contract-01-baseline",
+  "branch": "agent/gemini-contract-01",
+  "tests": {
+    "baseline_total": 110,
+    "baseline_pass": 110,
+    "new_serialization_total": 51,
+    "new_serialization_pass": 51,
+    "combined_total": 161,
+    "combined_pass": 161
+  },
+  "coverage": {
+    "round_trip_types": 10,
+    "fixture_files": 4,
+    "error_handling_tests": 21,
+    "consumer_smoke_tests": 2
+  },
+  "checks": {
+    "guard_scope": "passed",
+    "module_governance": "passed",
+    "compileall": "passed",
+    "git_diff_check": "clean"
+  }
+}
