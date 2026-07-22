@@ -124,13 +124,13 @@
     {
       "id": "MOD-REPLAY",
       "name": "Replay and observability",
-      "status": "PLANNED",
-      "version": "0.0.0",
+      "status": "CANDIDATE",
+      "version": "0.1.0",
       "owner": "@weijinn97-ai",
       "paths": ["bot/replay/**", "tools/replay_*.py"],
       "public_api": ["bot.replay"],
-      "tests": [],
-      "evidence": "",
+      "tests": ["tests/test_replay.py"],
+      "evidence": "docs/acceptance/replay/0.1.0/",
       "blocked_by": ["MOD-CONTRACTS", "MOD-STATE"]
     },
     {

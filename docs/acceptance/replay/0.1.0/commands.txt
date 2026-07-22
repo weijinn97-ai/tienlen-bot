@@ -1,0 +1,6 @@
+py -3 -m unittest discover -s tests -p "test_replay.py" -v
+py -3 tools/replay_validate.py docs/acceptance/replay/0.1.0/fixture.json
+py -3 -m unittest discover -s tests
+py -3 -m compileall -q bot contracts tools
+py -3 tools/check_module_governance.py
+git diff --check
