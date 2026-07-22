@@ -8,7 +8,9 @@
   "required_branch": "agent/gemini-data-01",
   "checkout_directory": "tienlen-bot-gemini",
   "output_directory": "GEMINI_DATA_01_OUTPUT",
-  "status": "ACTIVE",
+  "status": "BLOCKED_ON_DATA",
+  "completed_merge": "d424709",
+  "blocked_reason": "Need reviewed bbox annotations, independent leakage-safe val/test sessions, TABLE_PLAY ground truth, and 2000 BUTTON_UI hard negatives before training.",
   "policy": "deny_by_default",
   "allowed_new_paths": [
     "tools/build_dataset_inventory.py",
