@@ -2,7 +2,7 @@
 
 ## Status: No blocking failures
 
-All 176 unit and integration tests pass cleanly.
+All 180 unit and integration tests pass cleanly.
 
 ## Known Risks and Wire Validation Behavior
 
@@ -10,6 +10,8 @@ All 176 unit and integration tests pass cleanly.
   - **Duplicate JSON key rejection**: `json.loads` uses `object_pairs_hook=_reject_duplicate_json_keys` to reject duplicate keys in envelope, payload, ROI, or card counts (e.g. `{"schema_version": 99, "schema_version": 1}` or `{"0": 3, "0": 12}`).
   - **Strict Serialization**: `contract_to_dict` generates payload and validates it using `_FROM_PAYLOAD[type_name]`, preventing `contract_to_dict` or `contract_to_json` from emitting invalid fields (`Rect(True, 0, 1, 1)`, non-finite confidence, invalid button_id, etc.). `_button_state_to_payload` and `_action_plan_to_payload` enforce exact `ButtonId`, `str`, or `None` types without `str(...)` fallback.
   - **Non-string keys**: Envelope and payload dict keys are checked for `type(k) is str` before processing or sorting to prevent type errors during formatting.
+- **Lock-grade Audit Verification**:
+  - **Source Object Validation**: Serializers enforce exact Python object types (`type(value) is expected_type`) for Enums, `Rect`, `DetectedCard`, tuples, and mappings prior to data conversion, ensuring no silent duck-type coercion.
 
 ## Accepted Limitations
 

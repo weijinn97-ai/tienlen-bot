@@ -1,4 +1,4 @@
-# Acceptance Evidence – contracts 0.2.0 CANDIDATE (Strict Owner Audit)
+# Acceptance Evidence – contracts 0.2.0 CANDIDATE (Lock-grade Audit)
 
 ## Environment
 
@@ -10,16 +10,16 @@
 
 ## Scope
 
-Added stable serialization, strict wire-boundary validation (duplicate key rejection, payload validation on serialization), and compatibility fixtures for contracts module.
+Added stable serialization, strict wire-boundary validation (duplicate key rejection, payload validation on serialization), lock-grade source-object validation (exact type checking for Enums, classes, and containers), and compatibility fixtures for contracts module.
 No changes to `contracts/interfaces.py`, card encoding, or existing contract semantics.
 
 ## Files Changed
 
 | File | Action |
 |------|--------|
-| `contracts/serialization.py` | MODIFIED (Duplicate key rejection, serialization boundary validation) |
+| `contracts/serialization.py` | MODIFIED (Duplicate key rejection, strict source-object validation) |
 | `contracts/__init__.py` | MODIFIED (Export public serialization API) |
-| `tests/test_contract_serialization.py` | MODIFIED (66 serialization & audit tests) |
+| `tests/test_contract_serialization.py` | MODIFIED (70 serialization & audit tests) |
 | `tests/fixtures/contracts_v1/perception_snapshot_full.json` | NEW |
 | `tests/fixtures/contracts_v1/table_state_full.json` | NEW |
 | `tests/fixtures/contracts_v1/action_plan_play.json` | NEW |
@@ -28,8 +28,8 @@ No changes to `contracts/interfaces.py`, card encoding, or existing contract sem
 ## Test Results
 
 - **Baseline tests**: 110/110 OK
-- **Serialization & Audit tests**: 66/66 OK
-- **Total tests**: 176/176 OK
+- **Serialization & Audit tests**: 70/70 OK
+- **Total tests**: 180/180 OK
 - **Compile check**: `py -3 -m compileall -q bot contracts tools` – clean
 - **Governance check**: `py -3 tools/check_module_governance.py` – passed
 - **Scope guard**: `gemini_handoff_bundle/guard_scope.ps1` – passed

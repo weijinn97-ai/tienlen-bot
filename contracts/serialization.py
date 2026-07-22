@@ -111,15 +111,26 @@ def _require_confidence(val: Any, field_name: str) -> float:
     return fval
 
 
+def _require_tuple(val: Any, field_name: str) -> tuple[Any, ...]:
+    if type(val) is not tuple:
+        raise TypeError(f"{field_name} must be exactly tuple, got {type(val).__name__}")
+    return val
+
+
+def _require_contract(val: Any, expected_cls: type, field_name: str) -> Any:
+    if type(val) is not expected_cls:
+        raise TypeError(f"{field_name} must be exactly {expected_cls.__name__}, got {type(val).__name__}")
+    return val
+
 # ---------------------------------------------------------------------------
 # Enum helpers
 # ---------------------------------------------------------------------------
 
 
-def _enum_to_value(e: Enum) -> Any:
-    """Serialize an enum member by its value."""
-    if not isinstance(e, Enum):
-        raise TypeError(f"Expected Enum instance, got {type(e).__name__}")
+def _enum_to_value(e: Any, expected_cls: type, field_name: str) -> Any:
+    """Serialize an enum member by its value, requiring exact type match."""
+    if type(e) is not expected_cls:
+        raise TypeError(f"{field_name} must be exactly {expected_cls.__name__}, got {type(e).__name__}")
     return e.value
 
 
@@ -165,37 +176,42 @@ def _parse_target_button(val: Any, field_name: str) -> ButtonId | str | None:
 
 
 def _rect_to_payload(r: Rect) -> dict[str, Any]:
+    _require_contract(r, Rect, "Rect")
     return {"x": r.x, "y": r.y, "width": r.width, "height": r.height}
 
 
 def _detected_card_to_payload(c: DetectedCard) -> dict[str, Any]:
+    _require_contract(c, DetectedCard, "DetectedCard")
     d: dict[str, Any] = {
         "code": c.code,
         "roi": _rect_to_payload(c.roi),
-        "zone": _enum_to_value(c.zone),
+        "zone": _enum_to_value(c.zone, CardZone, "DetectedCard.zone"),
         "confidence": c.confidence,
     }
-    d["seat"] = _enum_to_value(c.seat) if c.seat is not None else None
+    d["seat"] = _enum_to_value(c.seat, SeatPosition, "DetectedCard.seat") if c.seat is not None else None
     return d
 
 
 def _card_combo_to_payload(cc: CardCombo) -> dict[str, Any]:
+    _require_contract(cc, CardCombo, "CardCombo")
+    _require_tuple(cc.cards, "CardCombo.cards")
     return {
         "cards": list(cc.cards),
         "combo_type": cc.combo_type,
-        "owner": _enum_to_value(cc.owner) if cc.owner is not None else None,
+        "owner": _enum_to_value(cc.owner, SeatPosition, "CardCombo.owner") if cc.owner is not None else None,
         "confidence": cc.confidence,
     }
 
 
 def _button_state_to_payload(bs: ButtonState) -> dict[str, Any]:
+    _require_contract(bs, ButtonState, "ButtonState")
     bid = bs.button_id
-    if isinstance(bid, ButtonId):
-        bid_val = _enum_to_value(bid)
+    if type(bid) is ButtonId:
+        bid_val = _enum_to_value(bid, ButtonId, "ButtonState.button_id")
     elif type(bid) is str:
         bid_val = bid
     else:
-        raise TypeError(f"ButtonState.button_id must be ButtonId or str, got {type(bid).__name__}")
+        raise TypeError(f"ButtonState.button_id must be exactly ButtonId or str, got {type(bid).__name__}")
     return {
         "button_id": bid_val,
         "label": bs.label,
@@ -207,44 +223,63 @@ def _button_state_to_payload(bs: ButtonState) -> dict[str, Any]:
 
 
 def _turn_evidence_to_payload(te: TurnOwnerEvidence) -> dict[str, Any]:
+    _require_contract(te, TurnOwnerEvidence, "TurnOwnerEvidence")
     return {
-        "primary_signal": _enum_to_value(te.primary_signal),
+        "primary_signal": _enum_to_value(te.primary_signal, TurnPrimarySignal, "TurnOwnerEvidence.primary_signal"),
         "primary_roi": _rect_to_payload(te.primary_roi),
         "primary_confidence": te.primary_confidence,
-        "secondary_signal": _enum_to_value(te.secondary_signal),
+        "secondary_signal": _enum_to_value(te.secondary_signal, TurnSecondarySignal, "TurnOwnerEvidence.secondary_signal"),
         "secondary_confidence": te.secondary_confidence,
         "signals_agree": te.signals_agree,
         "notes": te.notes,
     }
 
 
-def _seat_counts_to_payload(counts: Any) -> dict[str, int]:
+def _seat_counts_to_payload(counts: Any, field_name: str) -> dict[str, int]:
     """Convert SeatPosition→int mapping to stable string keys."""
-    return {str(_enum_to_value(seat)): count for seat, count in counts.items()}
+    if not hasattr(counts, "items"):
+        raise TypeError(f"{field_name} must be a mapping, got {type(counts).__name__}")
+    res: dict[str, int] = {}
+    for seat, count in counts.items():
+        if type(seat) is not SeatPosition:
+            raise TypeError(f"{field_name} keys must be exactly SeatPosition, got {type(seat).__name__}")
+        if type(count) is not int:
+            raise TypeError(f"{field_name}[{seat}] count must be exact int, got {type(count).__name__}")
+        if count < 0 or count > 13:
+            raise ValueError(f"{field_name}[{seat}] count must be in [0, 13], got {count}")
+        res[str(_enum_to_value(seat, SeatPosition, f"{field_name} key"))] = count
+    return res
 
 
 def _perception_snapshot_to_payload(ps: PerceptionSnapshot) -> dict[str, Any]:
+    _require_contract(ps, PerceptionSnapshot, "PerceptionSnapshot")
+    _require_tuple(ps.cards, "PerceptionSnapshot.cards")
+    _require_tuple(ps.buttons, "PerceptionSnapshot.buttons")
     return {
         "bot_id": ps.bot_id,
         "frame_id": ps.frame_id,
         "frame_ts": ps.frame_ts,
         "confidence": ps.confidence,
         "cards": [_detected_card_to_payload(c) for c in ps.cards],
-        "player_card_counts": _seat_counts_to_payload(ps.player_card_counts),
-        "turn_owner": _enum_to_value(ps.turn_owner) if ps.turn_owner is not None else None,
+        "player_card_counts": _seat_counts_to_payload(ps.player_card_counts, "PerceptionSnapshot.player_card_counts"),
+        "turn_owner": _enum_to_value(ps.turn_owner, SeatPosition, "PerceptionSnapshot.turn_owner") if ps.turn_owner is not None else None,
         "turn_owner_evidence": (
             _turn_evidence_to_payload(ps.turn_owner_evidence)
             if ps.turn_owner_evidence is not None
             else None
         ),
         "buttons": [_button_state_to_payload(b) for b in ps.buttons],
-        "game_phase": _enum_to_value(ps.game_phase),
+        "game_phase": _enum_to_value(ps.game_phase, GamePhase, "PerceptionSnapshot.game_phase"),
         "room_id": ps.room_id,
         "round_text": ps.round_text,
     }
 
 
 def _table_state_to_payload(ts: TableState) -> dict[str, Any]:
+    _require_contract(ts, TableState, "TableState")
+    _require_tuple(ts.my_cards, "TableState.my_cards")
+    _require_tuple(ts.selected_cards, "TableState.selected_cards")
+    _require_tuple(ts.buttons, "TableState.buttons")
     return {
         "frame_id": ts.frame_id,
         "frame_ts": ts.frame_ts,
@@ -256,23 +291,24 @@ def _table_state_to_payload(ts: TableState) -> dict[str, Any]:
             if ts.last_played_combo is not None
             else None
         ),
-        "player_card_counts": _seat_counts_to_payload(ts.player_card_counts),
-        "turn_owner": _enum_to_value(ts.turn_owner) if ts.turn_owner is not None else None,
+        "player_card_counts": _seat_counts_to_payload(ts.player_card_counts, "TableState.player_card_counts"),
+        "turn_owner": _enum_to_value(ts.turn_owner, SeatPosition, "TableState.turn_owner") if ts.turn_owner is not None else None,
         "turn_owner_evidence": (
             _turn_evidence_to_payload(ts.turn_owner_evidence)
             if ts.turn_owner_evidence is not None
             else None
         ),
         "buttons": [_button_state_to_payload(b) for b in ts.buttons],
-        "game_phase": _enum_to_value(ts.game_phase),
+        "game_phase": _enum_to_value(ts.game_phase, GamePhase, "TableState.game_phase"),
         "room_id": ts.room_id,
     }
 
 
 def _verify_spec_to_payload(vs: VerifySpec) -> dict[str, Any]:
+    _require_contract(vs, VerifySpec, "VerifySpec")
     return {
         "roi": _rect_to_payload(vs.roi),
-        "expected_change": _enum_to_value(vs.expected_change),
+        "expected_change": _enum_to_value(vs.expected_change, VerifyExpectedChange, "VerifySpec.expected_change"),
         "timeout_ms": vs.timeout_ms,
         "max_retries": vs.max_retries,
         "escalate_to_hand_count": vs.escalate_to_hand_count,
@@ -280,17 +316,19 @@ def _verify_spec_to_payload(vs: VerifySpec) -> dict[str, Any]:
 
 
 def _action_plan_to_payload(ap: ActionPlan) -> dict[str, Any]:
+    _require_contract(ap, ActionPlan, "ActionPlan")
+    _require_tuple(ap.cards, "ActionPlan.cards")
     tb = ap.target_button
     if tb is None:
         tb_val = None
-    elif isinstance(tb, ButtonId):
-        tb_val = _enum_to_value(tb)
+    elif type(tb) is ButtonId:
+        tb_val = _enum_to_value(tb, ButtonId, "ActionPlan.target_button")
     elif type(tb) is str:
         tb_val = tb
     else:
         raise TypeError(f"ActionPlan.target_button must be ButtonId, str, or None, got {type(tb).__name__}")
     return {
-        "kind": _enum_to_value(ap.kind),
+        "kind": _enum_to_value(ap.kind, ActionKind, "ActionPlan.kind"),
         "cards": list(ap.cards),
         "target_button": tb_val,
         "verify_spec": (
@@ -304,6 +342,7 @@ def _action_plan_to_payload(ap: ActionPlan) -> dict[str, Any]:
 
 
 def _consensus_spec_to_payload(cs: ConsensusSpec) -> dict[str, Any]:
+    _require_contract(cs, ConsensusSpec, "ConsensusSpec")
     return {
         "history_size": cs.history_size,
         "required_matches": cs.required_matches,

@@ -874,6 +874,92 @@ class AdversarialAuditTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             contract_from_dict(payload_env)  # type: ignore
 
+    def test_serialization_rejects_fake_enum_types(self) -> None:
+        """contract_to_dict and contract_to_json reject fake Enum/IntEnum objects."""
+        from enum import Enum, IntEnum
+
+        class FakeZone(Enum):
+            MY_HAND = "my_hand"
+        class FakePhase(Enum):
+            PLAYING = "playing"
+        class FakeAction(Enum):
+            WAIT = "wait"
+        class FakeSeat(IntEnum):
+            SELF = 0
+
+        # FakeZone
+        dc = _sample_detected_card()
+        object.__setattr__(dc, "zone", FakeZone.MY_HAND)
+        with self.assertRaises(TypeError):
+            contract_to_dict(dc)
+
+        # FakePhase
+        ts = _sample_table_state()
+        object.__setattr__(ts, "game_phase", FakePhase.PLAYING)
+        with self.assertRaises(TypeError):
+            contract_to_dict(ts)
+
+        # FakeAction
+        ap = _sample_action_plan_wait()
+        object.__setattr__(ap, "kind", FakeAction.WAIT)
+        with self.assertRaises(TypeError):
+            contract_to_dict(ap)
+
+        # FakeSeat in counts
+        ts2 = _sample_table_state()
+        object.__setattr__(ts2, "player_card_counts", {FakeSeat.SELF: 5})
+        with self.assertRaises(TypeError):
+            contract_to_dict(ts2)
+
+    def test_serialization_rejects_duck_typed_objects(self) -> None:
+        """contract_to_dict and contract_to_json reject duck-typed fake contracts."""
+        class FakeRect:
+            def __init__(self):
+                self.x, self.y, self.width, self.height = 0, 0, 10, 10
+        class FakeDetectedCard:
+            def __init__(self):
+                self.code = "3S"
+                self.roi = _sample_rect()
+                self.zone = CardZone.MY_HAND
+                self.confidence = 0.9
+                self.seat = None
+
+        bs = _sample_button_state()
+        object.__setattr__(bs, "roi", FakeRect())
+        with self.assertRaises(TypeError):
+            contract_to_dict(bs)
+
+        ps = _sample_perception_snapshot()
+        object.__setattr__(ps, "cards", (FakeDetectedCard(),))
+        with self.assertRaises(TypeError):
+            contract_to_dict(ps)
+
+    def test_serialization_rejects_source_list_for_tuples(self) -> None:
+        """contract_to_dict and contract_to_json reject list where tuple is required."""
+        ps = _sample_perception_snapshot()
+        object.__setattr__(ps, "cards", list(ps.cards))
+        with self.assertRaises(TypeError):
+            contract_to_dict(ps)
+
+        ps2 = _sample_perception_snapshot()
+        object.__setattr__(ps2, "buttons", list(ps2.buttons))
+        with self.assertRaises(TypeError):
+            contract_to_dict(ps2)
+
+    def test_serialization_rejects_mutated_wrong_optional(self) -> None:
+        """contract_to_dict and contract_to_json reject wrong type in optional fields."""
+        # DetectedCard.seat is Optional[SeatPosition]
+        dc = _sample_detected_card()
+        object.__setattr__(dc, "seat", "self")  # not SeatPosition
+        with self.assertRaises(TypeError):
+            contract_to_dict(dc)
+
+        # TableState.last_played_combo is Optional[CardCombo]
+        ts = _sample_table_state()
+        object.__setattr__(ts, "last_played_combo", "not a combo")
+        with self.assertRaises(TypeError):
+            contract_to_dict(ts)
+
 
 # -----------------------------------------------------------------------
 # Consumer smoke tests
