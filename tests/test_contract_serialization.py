@@ -764,6 +764,118 @@ class StrictWireValidationTests(unittest.TestCase):
 
 
 # -----------------------------------------------------------------------
+# Adversarial Audit Tests (Strict Owner Audit PR #26)
+# -----------------------------------------------------------------------
+
+
+class AdversarialAuditTests(unittest.TestCase):
+    """Regression tests required by Strict Owner Audit (PR #26)."""
+
+    def test_duplicate_schema_version_json_key_rejected(self) -> None:
+        """Duplicate schema_version key in JSON raises ValueError."""
+        document = '{"schema_version": 99, "schema_version": 1, "contract_type": "Rect", "payload": {"x": 0, "y": 0, "width": 1, "height": 1}}'
+        with self.assertRaises(ValueError) as cm:
+            contract_from_json(document)
+        self.assertIn("Duplicate", str(cm.exception))
+
+    def test_duplicate_nested_counts_json_key_rejected(self) -> None:
+        """Duplicate key in nested JSON player_card_counts raises ValueError."""
+        document = (
+            '{"schema_version": 1, "contract_type": "TableState", "payload": {'
+            '"frame_id": "f1", "frame_ts": 100, "confidence": 0.9, "my_cards": [], "selected_cards": [], '
+            '"last_played_combo": null, "player_card_counts": {"0": 3, "0": 12}, "turn_owner": null, '
+            '"turn_owner_evidence": null, "buttons": [], "game_phase": "playing", "room_id": null}}'
+        )
+        with self.assertRaises(ValueError) as cm:
+            contract_from_json(document)
+        self.assertIn("Duplicate", str(cm.exception))
+
+    def test_serialization_rejects_invalid_button_id_types(self) -> None:
+        """contract_to_dict and contract_to_json reject dict/list/bool button_id and target_button."""
+        for bad_id in ({"bad": 1}, [1, 2], True, 123):
+            with self.subTest(bad_id=bad_id):
+                bs = ButtonState(
+                    button_id=bad_id,  # type: ignore
+                    label="Bad",
+                    roi=_sample_rect(),
+                    is_visible=True,
+                    is_enabled=True,
+                    confidence=0.9,
+                )
+                with self.assertRaises(TypeError):
+                    contract_to_dict(bs)
+                with self.assertRaises(TypeError):
+                    contract_to_json(bs)
+
+                ap = ActionPlan(
+                    kind=ActionKind.PLAY,
+                    cards=("3S",),
+                    target_button=bad_id,  # type: ignore
+                    confidence=0.9,
+                    reason="test",
+                )
+                with self.assertRaises(TypeError):
+                    contract_to_dict(ap)
+                with self.assertRaises(TypeError):
+                    contract_to_json(ap)
+
+    def test_serialization_rejects_non_finite_confidence(self) -> None:
+        """contract_to_dict and contract_to_json reject contracts with non-finite confidence."""
+        for bad_conf in (float("nan"), float("inf"), float("-inf")):
+            with self.subTest(conf=bad_conf):
+                bs = ButtonState(
+                    button_id=ButtonId.PLAY,
+                    label="Play",
+                    roi=_sample_rect(),
+                    is_visible=True,
+                    is_enabled=True,
+                    confidence=0.9,
+                )
+                object.__setattr__(bs, "confidence", bad_conf)
+                with self.assertRaises(ValueError):
+                    contract_to_dict(bs)
+                with self.assertRaises(ValueError):
+                    contract_to_json(bs)
+
+    def test_serialization_rejects_bool_in_integer_fields(self) -> None:
+        """contract_to_dict and contract_to_json reject bool in integer fields like Rect.x and frame_ts."""
+        r = Rect(x=True, y=0, width=10, height=10)  # type: ignore
+        with self.assertRaises(TypeError):
+            contract_to_dict(r)
+        with self.assertRaises(TypeError):
+            contract_to_json(r)
+
+        ts = TableState(
+            frame_id="f1",
+            frame_ts=True,  # type: ignore
+            confidence=0.9,
+        )
+        with self.assertRaises(TypeError):
+            contract_to_dict(ts)
+        with self.assertRaises(TypeError):
+            contract_to_json(ts)
+
+    def test_direct_dict_non_string_keys_rejected(self) -> None:
+        """Envelope or payload dict with non-string key raises TypeError."""
+        envelope = {
+            123: "non-string key",
+            "schema_version": 1,
+            "contract_type": "Rect",
+            "payload": {"x": 0, "y": 0, "width": 1, "height": 1},
+        }
+        with self.assertRaises(TypeError):
+            contract_from_dict(envelope)  # type: ignore
+
+        payload_env = {
+            "schema_version": 1,
+            "contract_type": "Rect",
+            "payload": {123: 0, "y": 0, "width": 1, "height": 1},
+        }
+        with self.assertRaises(TypeError):
+            contract_from_dict(payload_env)  # type: ignore
+
+
+# -----------------------------------------------------------------------
 # Consumer smoke tests
 # -----------------------------------------------------------------------
 

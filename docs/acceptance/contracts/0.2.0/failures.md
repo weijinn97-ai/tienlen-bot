@@ -2,17 +2,14 @@
 
 ## Status: No blocking failures
 
-All 170 unit and integration tests pass cleanly.
+All 176 unit and integration tests pass cleanly.
 
 ## Known Risks and Wire Validation Behavior
 
-- **Strict Wire Validation**:
-  - JSON non-finite constants (`NaN`, `Infinity`, `-Infinity`) are strictly rejected via `parse_constant` callback.
-  - Direct Python dict values `float("nan")`, `float("inf")`, `float("-inf")` in confidence fields raise `ValueError`.
-  - `schema_version=True` (boolean `True`) raises `TypeError` because `type(True)` is `bool`.
-  - `player_card_counts` requires key `in {"0", "1", "2", "3"}`; keys like `"00"`, `"4"`, `"SELF"` raise `ValueError`. Count values must be `int` (`0 <= count <= 13`); boolean `True` raises `TypeError`.
-  - `ButtonState.button_id` must be string; `ActionPlan.target_button` must be string or `None`. Objects/lists/numerics/booleans raise `TypeError`.
-  - Integer fields (e.g., `frame_ts`, `x`, `y`, `width`, `height`, `timeout_ms`, `max_retries`) enforce `type(val) is int` to strictly reject booleans.
+- **Strict Owner Audit Verification**:
+  - **Duplicate JSON key rejection**: `json.loads` uses `object_pairs_hook=_reject_duplicate_json_keys` to reject duplicate keys in envelope, payload, ROI, or card counts (e.g. `{"schema_version": 99, "schema_version": 1}` or `{"0": 3, "0": 12}`).
+  - **Strict Serialization**: `contract_to_dict` generates payload and validates it using `_FROM_PAYLOAD[type_name]`, preventing `contract_to_dict` or `contract_to_json` from emitting invalid fields (`Rect(True, 0, 1, 1)`, non-finite confidence, invalid button_id, etc.). `_button_state_to_payload` and `_action_plan_to_payload` enforce exact `ButtonId`, `str`, or `None` types without `str(...)` fallback.
+  - **Non-string keys**: Envelope and payload dict keys are checked for `type(k) is str` before processing or sorting to prevent type errors during formatting.
 
 ## Accepted Limitations
 

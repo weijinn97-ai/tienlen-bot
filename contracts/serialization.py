@@ -118,6 +118,8 @@ def _require_confidence(val: Any, field_name: str) -> float:
 
 def _enum_to_value(e: Enum) -> Any:
     """Serialize an enum member by its value."""
+    if not isinstance(e, Enum):
+        raise TypeError(f"Expected Enum instance, got {type(e).__name__}")
     return e.value
 
 
@@ -190,8 +192,10 @@ def _button_state_to_payload(bs: ButtonState) -> dict[str, Any]:
     bid = bs.button_id
     if isinstance(bid, ButtonId):
         bid_val = _enum_to_value(bid)
+    elif type(bid) is str:
+        bid_val = bid
     else:
-        bid_val = str(bid)
+        raise TypeError(f"ButtonState.button_id must be ButtonId or str, got {type(bid).__name__}")
     return {
         "button_id": bid_val,
         "label": bs.label,
@@ -277,12 +281,14 @@ def _verify_spec_to_payload(vs: VerifySpec) -> dict[str, Any]:
 
 def _action_plan_to_payload(ap: ActionPlan) -> dict[str, Any]:
     tb = ap.target_button
-    if isinstance(tb, ButtonId):
-        tb_val = _enum_to_value(tb)
-    elif tb is not None:
-        tb_val = str(tb)
-    else:
+    if tb is None:
         tb_val = None
+    elif isinstance(tb, ButtonId):
+        tb_val = _enum_to_value(tb)
+    elif type(tb) is str:
+        tb_val = tb
+    else:
+        raise TypeError(f"ActionPlan.target_button must be ButtonId, str, or None, got {type(tb).__name__}")
     return {
         "kind": _enum_to_value(ap.kind),
         "cards": list(ap.cards),
@@ -325,6 +331,9 @@ _TO_PAYLOAD = {
 
 def _require_keys(data: dict, keys: set[str], type_name: str) -> None:
     """Validate that *data* has exactly the expected keys."""
+    for k in data.keys():
+        if type(k) is not str:
+            raise TypeError(f"{type_name}: dict key must be str, got {type(k).__name__}")
     actual = set(data.keys())
     missing = keys - actual
     extra = actual - keys
@@ -608,10 +617,17 @@ def contract_to_dict(value: ContractType) -> dict[str, Any]:
     if type_name is None:
         raise TypeError(f"Unsupported contract type: {cls.__name__}")
     serializer = _TO_PAYLOAD[cls]
+    payload = serializer(value)
+
+    # Validate generated payload using matching deserializer to enforce
+    # strict wire validation on serialization output as well
+    deserializer = _FROM_PAYLOAD[type_name]
+    deserializer(payload)
+
     return {
         "schema_version": CONTRACT_SCHEMA_VERSION,
         "contract_type": type_name,
-        "payload": serializer(value),
+        "payload": payload,
     }
 
 
@@ -626,6 +642,10 @@ def contract_from_dict(
     """
     if type(data) is not dict:
         raise TypeError(f"Expected dict envelope, got {type(data).__name__}")
+
+    for k in data.keys():
+        if type(k) is not str:
+            raise TypeError(f"Envelope key must be str, got {type(k).__name__}")
 
     envelope_keys = set(data.keys())
     expected_envelope_keys = {"schema_version", "contract_type", "payload"}
@@ -675,6 +695,15 @@ def _reject_json_constant(val: str) -> None:
     raise ValueError(f"Non-finite JSON constant not allowed: {val!r}")
 
 
+def _reject_duplicate_json_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+    res: dict[str, Any] = {}
+    for k, v in pairs:
+        if type(k) is str and k in res:
+            raise ValueError(f"Duplicate JSON key: {k!r}")
+        res[k] = v
+    return res
+
+
 def contract_from_json(document: str) -> ContractType:
     """Deserialize canonical JSON into a contract instance.
 
@@ -683,5 +712,9 @@ def contract_from_json(document: str) -> ContractType:
     """
     if type(document) is not str:
         raise TypeError(f"document must be a str, got {type(document).__name__}")
-    data = json.loads(document, parse_constant=_reject_json_constant)
+    data = json.loads(
+        document,
+        parse_constant=_reject_json_constant,
+        object_pairs_hook=_reject_duplicate_json_keys,
+    )
     return contract_from_dict(data)
