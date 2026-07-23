@@ -254,7 +254,7 @@ def _load_jsonl(path: Path, _max_records: int = 500000) -> list[Any]:
                     raise ValueError(f"Line {idx + 1} in {path.name} exceeds max length of {max_line_len}")
                 line_stripped = line.strip()
                 if not line_stripped:
-                    continue
+                    raise ValueError(f"Line {idx + 1} in {path.name} is blank or whitespace-only")
                 obj = json.loads(
                     line_stripped,
                     parse_constant=_reject_json_constant,
@@ -360,6 +360,7 @@ def load_ui_evaluation_bundle(bundle_dir: str) -> UiEvaluationBundle:
     if not bundle_json_path.exists():
         raise ValueError("Missing bundle.json")
 
+    bundle_sha = hashlib.sha256(bundle_json_path.read_bytes()).hexdigest()
     b = _load_json(bundle_json_path)
     _require_keys(b, {"schema_version", "dataset_id", "locked", "viewport", "files", "sha256"}, "bundle.json")
     if _require_type(b["schema_version"], int, "schema_version") != 1:
@@ -391,7 +392,7 @@ def load_ui_evaluation_bundle(bundle_dir: str) -> UiEvaluationBundle:
     resolved_paths: dict[str, str] = {}
 
     loaded_data = {}
-    input_sha256 = {}
+    input_sha256 = {"bundle.json": bundle_sha}
 
     for key, expected_filename in files_dict.items():
         _require_type(expected_filename, str, f"files.{key}")
@@ -684,7 +685,7 @@ def evaluate_ui_predictions(bundle: UiEvaluationBundle, config: UiEvaluationConf
     test_frame_ids = [fid for fid, rec in index_map.items() if rec.split == "test"]
 
     test_sessions = len(set(index_map[fid].session_id for fid in test_frame_ids))
-    test_sequences = len(set(f"{index_map[fid].session_id}_{index_map[fid].sequence_id}" for fid in test_frame_ids))
+    test_sequences = len(set((index_map[fid].session_id, index_map[fid].sequence_id) for fid in test_frame_ids))
     unique_sha256 = len(set(index_map[fid].sha256 for fid in test_frame_ids))
 
     button_state_total = 0

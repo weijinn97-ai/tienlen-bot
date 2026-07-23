@@ -600,6 +600,7 @@ class UiEvaluationTests(unittest.TestCase):
 
         manifest = json.loads((out_dir / "evaluated_manifest.json").read_text(encoding="utf-8"))
         self.assertIn("input_sha256", manifest)
+        self.assertIn("bundle.json", manifest["input_sha256"])
         self.assertIn("frames/s01-sq01-f001.png", manifest["input_sha256"])
         self.assertEqual(manifest["input_sha256"]["frames/s01-sq01-f001.png"], fi[0]["sha256"])
 
@@ -659,7 +660,10 @@ class UiEvaluationTests(unittest.TestCase):
         b["sha256"]["pr.jsonl"] = hashlib.sha256((Path(self.tmp_dir)/"pr.jsonl").read_bytes()).hexdigest()
         self._write_json("bundle.json", b)
 
-        load_ui_evaluation_bundle(self.tmp_dir)
+        bundle = load_ui_evaluation_bundle(self.tmp_dir)
+        config = UiEvaluationConfig(min_test_frames=1, min_negative_play_frames=1, min_test_sessions=1, min_test_sequences=1)
+        res = evaluate_ui_predictions(bundle, config)
+        self.assertEqual(res.metrics.test_sequences, 2)
 
     def test_r4_06_public_immutability(self):
         """Ensure direct callers cannot mutate passed collections after bundle/record instantiation."""
@@ -706,29 +710,11 @@ class UiEvaluationTests(unittest.TestCase):
         res = subprocess.run([sys.executable, str(cli), "--bundle", str(out_dir), "--output", str(out_dir / "out3")], env=env)
         self.assertEqual(res.returncode, 3)
 
-        script = out_dir / "run_pass.py"
-        script.write_text(f"""
-import sys
-from pathlib import Path
-sys.path.insert(0, r'{str(Path(__file__).parent.parent)}')
-from bot.perception import ui_evaluation
-import tools.evaluate_perception_ui
-ui_evaluation.DEFAULT_CONFIG = ui_evaluation.UiEvaluationConfig(
-    min_test_frames=1, min_negative_play_frames=1, min_test_sessions=1, min_test_sequences=1
-)
-tools.evaluate_perception_ui.UiEvaluationConfig = lambda *args, **kwargs: ui_evaluation.DEFAULT_CONFIG
-from tools.evaluate_perception_ui import main
-sys.argv = ['evaluate_perception_ui.py', '--bundle', r'{self.tmp_dir}', '--output', r'{str(out_dir / "out0")}']
-main()
-""", encoding="utf-8")
-        pr[0]["buttons"]["play"]["visible"] = False
-        pr[0]["buttons"]["play"]["enabled"] = False
-        self._write_jsonl("pr.jsonl", pr)
-        b["sha256"]["pr.jsonl"] = hashlib.sha256((Path(self.tmp_dir)/"pr.jsonl").read_bytes()).hexdigest()
-        self._write_json("bundle.json", b)
-
-        res = subprocess.run([sys.executable, str(script)], env=env)
-        self.assertEqual(res.returncode, 0)
+        from tools.evaluate_perception_ui import status_to_exit_code
+        self.assertEqual(status_to_exit_code("PASS"), 0)
+        self.assertEqual(status_to_exit_code("FAIL"), 1)
+        self.assertEqual(status_to_exit_code("INSUFFICIENT_DATA"), 2)
+        self.assertEqual(status_to_exit_code("SOMETHING_ELSE"), 3)
 
     def test_r4_08_load_jsonl_limits(self):
         """Ensure _load_jsonl rejects files with too many records or oversized rows."""
@@ -745,6 +731,11 @@ main()
             _load_jsonl(p)
         self.assertIn("exceeds max length", str(cm.exception))
 
+        p.write_text("{}\n\n{}\n", encoding="utf-8")
+        with self.assertRaises(ValueError) as cm:
+            _load_jsonl(p)
+        self.assertIn("is blank or whitespace-only", str(cm.exception))
+
     def test_r4_09_id_validation(self):
         """Ensure _is_safe_id rejects whitespace, path punctuation, and oversized strings."""
         from bot.perception.ui_evaluation import _is_safe_id
@@ -757,6 +748,30 @@ main()
         self.assertFalse(_is_safe_id("id:with:colons"))
         self.assertFalse(_is_safe_id("a" * 129))
         self.assertFalse(_is_safe_id(""))
+
+    def test_r5_01_inputs_unchanged(self):
+        """Verify that bundle.json, JSONL files, and images are byte-for-byte unchanged by load/evaluate/write."""
+        b, fi, gt, pr = self._setup_fs_bundle()
+
+        paths = [
+            Path(self.tmp_dir) / "bundle.json",
+            Path(self.tmp_dir) / "fi.jsonl",
+            Path(self.tmp_dir) / "gt.jsonl",
+            Path(self.tmp_dir) / "pr.jsonl",
+            Path(self.tmp_dir) / "frames" / "s01-sq01-f001.png"
+        ]
+        initial_bytes = {p: p.read_bytes() for p in paths}
+
+        bundle = load_ui_evaluation_bundle(self.tmp_dir)
+        config = UiEvaluationConfig(min_test_frames=1, min_negative_play_frames=1, min_test_sessions=1, min_test_sequences=1)
+        res = evaluate_ui_predictions(bundle, config)
+
+        out_dir = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, out_dir)
+        write_ui_evaluation_result(res, out_dir)
+
+        for p in paths:
+            self.assertEqual(p.read_bytes(), initial_bytes[p], f"{p.name} was modified by evaluation process")
 
 
 if __name__ == '__main__':

@@ -14,6 +14,21 @@ from bot.perception.ui_evaluation import (
 )
 
 
+def status_to_exit_code(status: str) -> int:
+    if status == UiEvaluationStatus.PASS.value:
+        print("Evaluation PASS")
+        return 0
+    elif status == UiEvaluationStatus.FAIL.value:
+        print("Evaluation FAIL")
+        return 1
+    elif status == UiEvaluationStatus.INSUFFICIENT_DATA.value:
+        print("Evaluation INSUFFICIENT_DATA")
+        return 2
+    else:
+        print(f"Evaluation {status}")
+        return 3
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate perception UI predictions")
     parser.add_argument("--bundle", required=True, help="Path to input bundle directory")
@@ -59,18 +74,7 @@ def main() -> None:
         print(f"Error writing output: {e}")
         sys.exit(3)
 
-    if result.status == UiEvaluationStatus.PASS.value:
-        print("Evaluation PASS")
-        sys.exit(0)
-    elif result.status == UiEvaluationStatus.FAIL.value:
-        print("Evaluation FAIL")
-        sys.exit(1)
-    elif result.status == UiEvaluationStatus.INSUFFICIENT_DATA.value:
-        print("Evaluation INSUFFICIENT_DATA")
-        sys.exit(2)
-    else:
-        print(f"Evaluation {result.status}")
-        sys.exit(3)
+    sys.exit(status_to_exit_code(result.status))
 
 
 if __name__ == "__main__":
