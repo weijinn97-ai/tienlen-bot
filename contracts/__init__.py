@@ -27,12 +27,20 @@ from .interfaces import (
     sort_cards,
     validate_card_code,
 )
+from .serialization import (
+    CONTRACT_SCHEMA_VERSION,
+    contract_from_dict,
+    contract_from_json,
+    contract_to_dict,
+    contract_to_json,
+)
 
 __all__ = [
     "ActionKind",
     "ActionPlan",
     "ButtonId",
     "ButtonState",
+    "CONTRACT_SCHEMA_VERSION",
     "CardCombo",
     "CardZone",
     "ConsensusSpec",
@@ -54,6 +62,10 @@ __all__ = [
     "VerifySpec",
     "card_sort_key",
     "card_strength",
+    "contract_from_dict",
+    "contract_from_json",
+    "contract_to_dict",
+    "contract_to_json",
     "sort_cards",
     "validate_card_code",
 ]

@@ -1,0 +1,1 @@
+{"contract_type":"ActionPlan","payload":{"cards":["QD","QH"],"confidence":0.95,"kind":"play","reason":"responding with pair of queens","target_button":"play","verify_spec":{"escalate_to_hand_count":true,"expected_change":"card_count_decreased","max_retries":2,"roi":{"height":100,"width":300,"x":100,"y":200},"timeout_ms":3000}},"schema_version":1}
