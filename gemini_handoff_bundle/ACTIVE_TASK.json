@@ -1,24 +1,25 @@
 {
   "schema_version": 1,
   "agent": "Google Gemini",
-  "task_id": "GEMINI-CONTRACT-01",
-  "issue": 2,
-  "instruction_file": "gemini_handoff_bundle/tasks/GEMINI_CONTRACT_01_VI.md",
-  "baseline_ref": "gemini-contract-01-baseline",
-  "required_branch": "agent/gemini-contract-01",
+  "task_id": "GEMINI-PERCEPTION-UI-01A",
+  "issue": 8,
+  "instruction_file": "gemini_handoff_bundle/tasks/GEMINI_PERCEPTION_UI_01A_VI.md",
+  "baseline_ref": "gemini-perception-ui-01a-baseline",
+  "required_branch": "agent/gemini-perception-ui-01a",
   "checkout_directory": "tienlen-bot-gemini",
-  "output_directory": "GEMINI_CONTRACT_01_OUTPUT",
+  "output_directory": "GEMINI_PERCEPTION_UI_01A_OUTPUT",
   "status": "ACTIVE",
   "policy": "deny_by_default",
   "allowed_new_paths": [
-    "contracts/serialization.py",
-    "tests/test_contract_serialization.py",
-    "tests/fixtures/contracts_v1/**",
-    "docs/acceptance/contracts/0.2.0/**",
-    "GEMINI_CONTRACT_01_OUTPUT/**"
+    "bot/perception/ui_evaluation.py",
+    "tools/evaluate_perception_ui.py",
+    "tests/test_perception_ui_evaluation.py",
+    "tests/fixtures/perception_ui/**",
+    "docs/acceptance/perception-ui/0.3.0/**",
+    "GEMINI_PERCEPTION_UI_01A_OUTPUT/**"
   ],
   "allowed_existing_file_modifications": [
-    "contracts/__init__.py"
+    "bot/perception/__init__.py"
   ],
   "forbidden_operations": [
     "push_or_commit_to_main",
@@ -27,10 +28,13 @@
     "git_reset_hard",
     "git_clean",
     "delete_or_rename_files",
-    "modify_contract_interfaces",
-    "change_card_encoding_or_semantics",
+    "modify_contracts_or_serialization",
+    "modify_existing_perception_detectors",
+    "modify_action_state_runtime_or_replay",
     "modify_existing_tests",
-    "modify_bot_runtime_or_perception",
+    "modify_raw_dataset_or_existing_fixtures",
+    "train_or_commit_model_weights",
+    "claim_production_metrics_without_locked_data",
     "change_module_status_or_registry",
     "install_new_dependencies",
     "start_next_task_without_new_active_policy"

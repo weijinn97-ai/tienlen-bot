@@ -14,14 +14,16 @@ Repository: `https://github.com/weijinn97-ai/tienlen-bot`
 Định danh cố định cho task đang mở:
 
 - Clone directory: `tienlen-bot-gemini`
-- Baseline tag: `gemini-contract-01-baseline`
-- Branch: `agent/gemini-contract-01`
-- Output directory: `GEMINI_CONTRACT_01_OUTPUT/`
-- GitHub issue: `#2 CONTRACT-01`
+- Baseline tag: `gemini-perception-ui-01a-baseline`
+- Branch: `agent/gemini-perception-ui-01a`
+- Output directory: `GEMINI_PERCEPTION_UI_01A_OUTPUT/`
+- GitHub issue: `#8 PERCEPTION-UI-01`
 
 ## Trạng thái hiện tại
 
-`GEMINI-CONTRACT-01` đang `ACTIVE`. Chỉ triển khai serialization/compatibility trong whitelist; không sửa `contracts/interfaces.py` hoặc semantics hiện hữu.
+`GEMINI-PERCEPTION-UI-01A` đang `ACTIVE`. Chỉ triển khai locked-replay
+evaluation contract, evaluator, CLI, tests và evidence trong whitelist.
+Không sửa detector button/OCR/turn hiện hữu, contracts, raw data, action hoặc runtime.
 
 ## Nguyên tắc quan trọng nhất
 

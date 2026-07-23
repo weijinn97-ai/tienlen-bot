@@ -1,18 +1,18 @@
 {
   "schema_version": 1,
-  "updated": "2026-07-19",
+  "updated": "2026-07-23",
   "status_flow": ["PLANNED", "IN_PROGRESS", "CANDIDATE", "LOCKED", "DEPRECATED"],
   "modules": [
     {
       "id": "MOD-CONTRACTS",
       "name": "Shared contracts",
       "status": "CANDIDATE",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "owner": "@weijinn97-ai",
       "paths": ["contracts/**"],
-      "public_api": ["contracts.interfaces"],
-      "tests": ["tests/test_contract_interfaces.py"],
-      "evidence": "docs/acceptance/contracts/0.1.0/",
+      "public_api": ["contracts.interfaces", "contracts.serialization"],
+      "tests": ["tests/test_contract_interfaces.py", "tests/test_contract_serialization.py"],
+      "evidence": "docs/acceptance/contracts/0.2.0/",
       "blocked_by": []
     },
     {
