@@ -31,21 +31,24 @@ Trạng thái: đã có branch protection, CI, CODEOWNERS, registry và 84 tests
 
 ### G1 - DATA-01, issue #5
 
-Trạng thái: `ACTIVE`.
+Trạng thái: code inventory đã merge; production gate vẫn `BLOCKED`.
 
-Kết quả: inventory, SHA-256/pHash dedup, split chống leakage, annotation QA, coverage report. Không train.
+Kết quả: inventory, SHA-256/pHash dedup, split chống leakage, annotation QA,
+coverage report đã có. Dataset hiện chỉ có 36 ảnh MY_HAND, 0 bbox production,
+0 val/test, 0 TABLE_PLAY và thiếu hard-negative; không được train production.
 
 Gate: raw không đổi; leakage bằng 0; reports deterministic; 100% val/test và ít nhất 20% train được chọn second review.
 
 ### G2 - CONTRACT-01, issue #2
 
-Trạng thái: chờ owner mở active policy mới.
+Trạng thái: `0.2.0 CANDIDATE`, PR #26 đã merge và có 182 tests.
 
-Kết quả: serialization/compatibility fixtures, consumer compatibility. Chỉ owner quyết định lock/tag.
+Kết quả: strict bidirectional serialization, compatibility fixtures, duplicate
+JSON rejection và source-object validation. Chưa `LOCKED`; chỉ owner quyết định lock/tag.
 
 ### G3 - REPLAY-01, issue #4
 
-Trạng thái: chờ G2 review.
+Trạng thái: code/evidence `0.1.0 CANDIDATE`; issue đã đóng.
 
 Kết quả: recorder/reader versioned, deterministic offline replay, checksums, malformed/stale evidence rejection.
 
@@ -57,9 +60,15 @@ Hand và table là hai dataset/model riêng. Đúng 52 class theo contract. Gate
 
 ### G5 - PERCEPTION-UI-01, issue #8
 
-Trạng thái: code safety đã có, production evidence còn thiếu.
+Trạng thái: `GEMINI-PERCEPTION-UI-01A` đang `ACTIVE`.
 
-Gate: button exact >= 99.5%; zero false PLAY trên ít nhất 2.000 negative/disabled frames; OCR critical exact >= 99%; low confidence UNKNOWN; zero false MY_TURN trên locked replay với hybrid agreement và 3/4 latest-frame consensus.
+Task 01A chỉ xây locked-replay bundle schema, evaluator deterministic, metric
+gate và CLI fail-safe. Không calibration detector và không claim production.
+
+Task 01B chỉ được mở sau review 01A và sau khi có bundle được duyệt. Gate cuối:
+button exact >= 99.5%; zero false PLAY trên ít nhất 2.000 negative/disabled
+frames; OCR critical exact >= 99%; low confidence UNKNOWN; zero false MY_TURN
+trên locked replay với hybrid agreement và 3/4 latest-frame consensus.
 
 ### G6 - STATE-01, issue #9
 
