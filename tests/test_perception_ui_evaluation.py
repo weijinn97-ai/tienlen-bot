@@ -24,7 +24,8 @@ from bot.perception.ui_evaluation import (
     load_ui_evaluation_bundle,
     write_ui_evaluation_result,
 )
-from PIL import Image
+import cv2
+import numpy as np
 
 class UiEvaluationTests(unittest.TestCase):
     def setUp(self):
@@ -163,13 +164,19 @@ class UiEvaluationTests(unittest.TestCase):
         p.write_text("\n".join(json.dumps(r) for r in rows), encoding="utf-8")
         return p
 
+    def _make_png(self, path: Path, width: int = 1280, height: int = 720, fill: int = 0) -> None:
+        """Write a valid PNG at *path* using OpenCV (no Pillow)."""
+        path.parent.mkdir(parents=True, exist_ok=True)
+        ok, buf = cv2.imencode(".png", np.full((height, width, 3), fill, dtype=np.uint8))
+        assert ok
+        path.write_bytes(buf.tobytes())
+
     def _setup_fs_bundle(self):
         d = Path(self.tmp_dir)
         fid = "s01-sq01-f001"
         img_path = d / "frames" / f"{fid}.png"
         img_path.parent.mkdir(parents=True, exist_ok=True)
-        img = Image.new('RGB', (1280, 720))
-        img.save(img_path, "PNG")
+        self._make_png(img_path, 1280, 720)
         sha = hashlib.sha256(img_path.read_bytes()).hexdigest()
         
         fi = [{"frame_id": fid, "relative_path": f"frames/{fid}.png", "sha256": sha, "session_id": "s01", "sequence_id": "sq01", "frame_index": 1, "split": "test", "review_status": "APPROVED", "reviewer_id": "b"}]
@@ -336,7 +343,7 @@ class UiEvaluationTests(unittest.TestCase):
         pr.append(pr[0].copy())
         
         img2 = Path(self.tmp_dir) / "frames" / "f2.png"
-        Image.new('RGB', (1280, 720), color="red").save(img2, "PNG")
+        self._make_png(img2, 1280, 720, fill=128)
         sha2 = hashlib.sha256(img2.read_bytes()).hexdigest()
         
         fi[1]["frame_id"] = "f2"
@@ -485,6 +492,84 @@ class UiEvaluationTests(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             load_ui_evaluation_bundle(self.tmp_dir)
         self.assertIn("Path collision detected", str(cm.exception))
+
+    # ------------------------------------------------------------------ #
+    # Round 2 adversarial & regression tests                               #
+    # ------------------------------------------------------------------ #
+
+    def test_r2_01_no_pillow_import(self):
+        """ui_evaluation must not import PIL/Pillow at module level."""
+        import importlib, types
+        import bot.perception.ui_evaluation as m
+        for name, obj in vars(m).items():
+            if isinstance(obj, types.ModuleType):
+                self.assertNotIn("PIL", obj.__name__, f"Module {obj.__name__!r} imported in ui_evaluation")
+
+    def test_r2_02_config_strict_float_type(self):
+        """UiEvaluationConfig must reject int where float is required."""
+        from bot.perception.ui_evaluation import UiEvaluationConfig
+        with self.assertRaises(ValueError):
+            UiEvaluationConfig(ocr_confidence_threshold=1)   # int, not float
+
+    def test_r2_03_config_strict_int_type(self):
+        """UiEvaluationConfig must reject float where int is required."""
+        from bot.perception.ui_evaluation import UiEvaluationConfig
+        with self.assertRaises(ValueError):
+            UiEvaluationConfig(min_test_frames=1.0)           # float, not int
+        with self.assertRaises(ValueError):
+            UiEvaluationConfig(min_test_frames=False)         # bool, not int
+
+    def test_r2_04_config_strict_bounds(self):
+        """UiEvaluationConfig must reject out-of-range float thresholds."""
+        from bot.perception.ui_evaluation import UiEvaluationConfig
+        with self.assertRaises(ValueError):
+            UiEvaluationConfig(ocr_confidence_threshold=1.5)
+
+    def test_r2_05_path_sibling_escape_rejected(self):
+        """A relative path that escapes the bundle via a sibling directory must be rejected."""
+        b, fi, gt, pr = self._setup_fs_bundle()
+        sibling = Path(self.tmp_dir + "-sibling")
+        sibling.mkdir(exist_ok=True)
+        try:
+            b["files"]["ground_truth"] = "../" + sibling.name + "/gt.jsonl"
+            # sha256 entry must match; just set something
+            b["sha256"]["../" + sibling.name + "/gt.jsonl"] = "0" * 64
+            del b["sha256"]["gt.jsonl"]
+            self._write_json("bundle.json", b)
+            with self.assertRaises(ValueError):
+                load_ui_evaluation_bundle(self.tmp_dir)
+        finally:
+            shutil.rmtree(sibling, ignore_errors=True)
+
+    def test_r2_06_corrupt_image_cv2(self):
+        """A file that is not a valid image must raise ValueError with 'Corrupt or invalid image'."""
+        b, fi, gt, pr = self._setup_fs_bundle()
+        img_path = Path(self.tmp_dir) / "frames" / f"{fi[0]['frame_id']}.png"
+        img_path.write_bytes(b"NOT_A_REAL_IMAGE_BYTES")
+        new_sha = hashlib.sha256(b"NOT_A_REAL_IMAGE_BYTES").hexdigest()
+        fi[0]["sha256"] = new_sha
+        self._write_jsonl("fi.jsonl", fi)
+        b["sha256"]["fi.jsonl"] = hashlib.sha256(
+            (Path(self.tmp_dir) / "fi.jsonl").read_bytes()
+        ).hexdigest()
+        self._write_json("bundle.json", b)
+        with self.assertRaises(ValueError) as cm:
+            load_ui_evaluation_bundle(self.tmp_dir)
+        self.assertIn("Corrupt or invalid image", str(cm.exception))
+
+    def test_r2_07_pred_ocr_mismatch_rejected(self):
+        """Prediction OCR field_id set that differs from GT must be rejected at load time."""
+        b, fi, gt, pr = self._setup_fs_bundle()
+        pr[0]["ocr_fields"][0]["field_id"] = "WRONG_ID"
+        self._write_jsonl("pr.jsonl", pr)
+        b["sha256"]["pr.jsonl"] = hashlib.sha256(
+            (Path(self.tmp_dir) / "pr.jsonl").read_bytes()
+        ).hexdigest()
+        self._write_json("bundle.json", b)
+        with self.assertRaises(ValueError) as cm:
+            load_ui_evaluation_bundle(self.tmp_dir)
+        self.assertIn("OCR fields mismatch", str(cm.exception))
+
 
 if __name__ == '__main__':
     unittest.main()

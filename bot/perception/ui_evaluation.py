@@ -11,7 +11,8 @@ from typing import Any, Optional, Mapping, Tuple
 from pathlib import Path
 from enum import Enum
 from types import MappingProxyType
-import struct
+import cv2
+import numpy as np
 
 
 class UiEvaluationStatus(Enum):
@@ -96,7 +97,7 @@ class UiEvaluationBundle:
     input_sha256: Mapping[str, str]
 
 
-@dataclass(frozen=True)
+@dataclass
 class UiEvaluationConfig:
     ocr_confidence_threshold: float = 0.75
     min_test_frames: int = 1
@@ -105,6 +106,37 @@ class UiEvaluationConfig:
     min_test_sequences: int = 50
     min_button_exact_accuracy: float = 0.995
     min_critical_ocr_exact_accuracy: float = 0.99
+
+    def __post_init__(self) -> None:
+        _float_fields = (
+            "ocr_confidence_threshold",
+            "min_button_exact_accuracy",
+            "min_critical_ocr_exact_accuracy",
+        )
+        _int_fields = (
+            "min_test_frames",
+            "min_negative_play_frames",
+            "min_test_sessions",
+            "min_test_sequences",
+        )
+        for name in _float_fields:
+            val = getattr(self, name)
+            if type(val) is not float:
+                raise ValueError(
+                    f"{name} must be exactly float, got {type(val).__name__}"
+                )
+            if not math.isfinite(val):
+                raise ValueError(f"{name} must be finite")
+            if not (0.0 <= val <= 1.0):
+                raise ValueError(f"{name} out of bounds [0.0, 1.0]")
+        for name in _int_fields:
+            val = getattr(self, name)
+            if type(val) is not int or type(val) is bool:
+                raise ValueError(
+                    f"{name} must be exactly int, got {type(val).__name__}"
+                )
+            if val < 0:
+                raise ValueError(f"{name} must be non-negative")
 
 
 DEFAULT_CONFIG = UiEvaluationConfig()
@@ -259,8 +291,10 @@ def _validate_path(rel_path: str, base: Path, resolved_paths: dict[str, str]) ->
     except RuntimeError:
         raise ValueError(f"Symlink loop or error resolving: {rel_path}")
 
-    # Canonical containment check
-    if not str(full_path).startswith(str(base.resolve())):
+    # Canonical containment check — use is_relative_to to avoid prefix-string false matches
+    try:
+        full_path.relative_to(base.resolve())
+    except ValueError:
         raise ValueError(f"Escape path detected: {rel_path}")
     
     canonical = str(full_path).lower()
@@ -275,29 +309,17 @@ def _verify_image(path: Path, expected_sha: str, expected_width: int, expected_h
     actual_sha = hashlib.sha256(data).hexdigest()
     if actual_sha != expected_sha:
         raise ValueError(f"Image checksum mismatch for {path.name}")
-    
-    # Simple width/height check for PNG
-    if data.startswith(b"\\x89PNG\\r\\n\\x1a\\n"):
-        if len(data) >= 24:
-            w, h = struct.unpack(">II", data[16:24])
-            if w != expected_width or h != expected_height:
-                raise ValueError(f"Image dimensions mismatch for {path.name}: {w}x{h} != {expected_width}x{expected_height}")
-    elif data.startswith(b"\\xff\\xd8"):
-        # We can try PIL if it is a JPEG, or we just trust the test cases. 
-        # Actually, let's use PIL safely since we confirmed it's available.
-        pass
-    
-    from PIL import Image
-    try:
-        with Image.open(path) as img:
-            img.verify()
-        # open again to get size because verify() might not set it reliably in some old versions
-        with Image.open(path) as img:
-            w, h = img.size
-            if w != expected_width or h != expected_height:
-                raise ValueError(f"Image dimensions mismatch for {path.name}: {w}x{h} != {expected_width}x{expected_height}")
-    except Exception as e:
-        raise ValueError(f"Corrupt or invalid image {path.name}: {e}")
+
+    # Decode with OpenCV (no Pillow dependency)
+    arr = np.frombuffer(data, dtype=np.uint8)
+    img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+    if img is None:
+        raise ValueError(f"Corrupt or invalid image {path.name}")
+    h, w = img.shape[:2]
+    if w != expected_width or h != expected_height:
+        raise ValueError(
+            f"Image dimensions mismatch for {path.name}: {w}x{h} != {expected_width}x{expected_height}"
+        )
 
 
 def load_ui_evaluation_bundle(bundle_dir: str) -> UiEvaluationBundle:
@@ -465,6 +487,12 @@ def load_ui_evaluation_bundle(bundle_dir: str) -> UiEvaluationBundle:
             negative_play_frame=_require_type(row["negative_play_frame"], bool, "negative_play_frame")
         ))
 
+    # Build per-frame GT OCR id sets for cross-validation against predictions
+    gt_ocr_id_sets: dict[str, set[str]] = {
+        rec.frame_id: {o.field_id for o in rec.ocr_fields}
+        for rec in ground_truth
+    }
+
     predictions = []
     pred_ids = set()
     for row in loaded_data["predictions"]:
@@ -506,6 +534,13 @@ def load_ui_evaluation_bundle(bundle_dir: str) -> UiEvaluationBundle:
                 text=_require_type(ocr_raw["text"], str, "text"),
                 confidence=conf
             ))
+
+        # Validate prediction OCR field_ids match GT for this frame
+        if fid in gt_ocr_id_sets and ocr_ids != gt_ocr_id_sets[fid]:
+            raise ValueError(
+                f"OCR fields mismatch for {fid}: "
+                f"pred={sorted(ocr_ids)} gt={sorted(gt_ocr_id_sets[fid])}"
+            )
 
         to = row["turn_owner"]
         if to is not None:
