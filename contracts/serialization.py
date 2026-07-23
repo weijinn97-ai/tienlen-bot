@@ -16,6 +16,7 @@ from __future__ import annotations
 import json
 import math
 from enum import Enum, IntEnum
+from collections.abc import Mapping
 from typing import Any, Union
 
 from contracts.interfaces import (
@@ -237,7 +238,7 @@ def _turn_evidence_to_payload(te: TurnOwnerEvidence) -> dict[str, Any]:
 
 def _seat_counts_to_payload(counts: Any, field_name: str) -> dict[str, int]:
     """Convert SeatPosition→int mapping to stable string keys."""
-    if not hasattr(counts, "items"):
+    if not isinstance(counts, Mapping):
         raise TypeError(f"{field_name} must be a mapping, got {type(counts).__name__}")
     res: dict[str, int] = {}
     for seat, count in counts.items():

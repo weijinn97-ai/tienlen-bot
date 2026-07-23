@@ -19,7 +19,7 @@ No changes to `contracts/interfaces.py`, card encoding, or existing contract sem
 |------|--------|
 | `contracts/serialization.py` | MODIFIED (Duplicate key rejection, strict source-object validation) |
 | `contracts/__init__.py` | MODIFIED (Export public serialization API) |
-| `tests/test_contract_serialization.py` | MODIFIED (70 serialization & audit tests) |
+| `tests/test_contract_serialization.py` | MODIFIED (72 serialization & audit tests) |
 | `tests/fixtures/contracts_v1/perception_snapshot_full.json` | NEW |
 | `tests/fixtures/contracts_v1/table_state_full.json` | NEW |
 | `tests/fixtures/contracts_v1/action_plan_play.json` | NEW |
@@ -28,8 +28,8 @@ No changes to `contracts/interfaces.py`, card encoding, or existing contract sem
 ## Test Results
 
 - **Baseline tests**: 110/110 OK
-- **Serialization & Audit tests**: 70/70 OK
-- **Total tests**: 180/180 OK
+- **Serialization & Audit tests**: 72/72 OK
+- **Total tests**: 182/182 OK
 - **Compile check**: `py -3 -m compileall -q bot contracts tools` – clean
 - **Governance check**: `py -3 tools/check_module_governance.py` – passed
 - **Scope guard**: `gemini_handoff_bundle/guard_scope.ps1` – passed

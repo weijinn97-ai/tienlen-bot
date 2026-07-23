@@ -17,14 +17,14 @@ Stabilize serialization, strict wire-boundary validation (both deserialization a
 |------|--------|-------------|
 | `contracts/serialization.py` | MODIFIED | Canonical JSON serialization with duplicate key rejection, bidirectional strict validation, and lock-grade source-object validation for all 10 contract types |
 | `contracts/__init__.py` | MODIFIED | Export `CONTRACT_SCHEMA_VERSION`, `contract_to_dict`, `contract_from_dict`, `contract_to_json`, `contract_from_json` |
-| `tests/test_contract_serialization.py` | MODIFIED | 70 tests covering round-trip, determinism, fixtures, strict wire validation, duplicate key rejection, serialization validation, error handling, consumers |
+| `tests/test_contract_serialization.py` | MODIFIED | 72 tests covering round-trip, determinism, fixtures, strict wire validation, duplicate key rejection, serialization validation, error handling, consumers |
 | `tests/fixtures/contracts_v1/perception_snapshot_full.json` | NEW | Full PerceptionSnapshot v1 fixture |
 | `tests/fixtures/contracts_v1/table_state_full.json` | NEW | Full TableState v1 fixture |
 | `tests/fixtures/contracts_v1/action_plan_play.json` | NEW | ActionPlan PLAY with VerifySpec fixture |
 | `tests/fixtures/contracts_v1/action_plan_wait.json` | NEW | ActionPlan WAIT minimal fixture |
 | `docs/acceptance/contracts/0.2.0/README.md` | MODIFIED | Acceptance evidence |
 | `docs/acceptance/contracts/0.2.0/commands.txt` | MODIFIED | Verification commands and LF SHA-256 calculation method |
-| `docs/acceptance/contracts/0.2.0/metrics.json` | MODIFIED | Machine-readable metrics (180 tests total) |
+| `docs/acceptance/contracts/0.2.0/metrics.json` | MODIFIED | Machine-readable metrics (182 tests total) |
 | `docs/acceptance/contracts/0.2.0/artifacts.sha256` | MODIFIED | LF-normalized SHA-256 checksums |
 | `docs/acceptance/contracts/0.2.0/failures.md` | MODIFIED | Strict wire validation behavior & audit documentation |
 
@@ -48,17 +48,19 @@ Stabilize serialization, strict wire-boundary validation (both deserialization a
   - `test_serialization_rejects_duck_typed_objects`
   - `test_serialization_rejects_source_list_for_tuples`
   - `test_serialization_rejects_mutated_wrong_optional`
-- [x] **Evidence & Checksums**: Updated all evidence files, metrics (180 tests total), and recalculated LF-normalized SHA-256 checksums.
+  - `test_serialization_rejects_duck_typed_mapping`
+  - `test_serialization_accepts_mapping_proxy_type`
+- [x] **Evidence & Checksums**: Updated all evidence files, metrics (182 tests total), and recalculated LF-normalized ASCII SHA-256 checksums explicitly via Python to fix UTF-16 issue.
 
 ## Tests Run + Exact Result
 
 ```
 py -3 -m unittest discover -s tests -p "test_contract_serialization.py" -v
-Ran 70 tests in 0.019s
+Ran 72 tests in 0.021s
 OK
 
 py -3 -m unittest discover -s tests -v
-Ran 180 tests in 3.321s
+Ran 182 tests in 3.421s
 OK
 
 powershell -ExecutionPolicy Bypass -File gemini_handoff_bundle/guard_scope.ps1

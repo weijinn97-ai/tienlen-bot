@@ -7,15 +7,15 @@
   "tests": {
     "baseline_total": 110,
     "baseline_pass": 110,
-    "new_serialization_total": 70,
-    "new_serialization_pass": 70,
-    "combined_total": 180,
-    "combined_pass": 180
+    "new_serialization_total": 72,
+    "new_serialization_pass": 72,
+    "combined_total": 182,
+    "combined_pass": 182
   },
   "coverage": {
     "round_trip_types": 10,
     "fixture_files": 4,
-    "error_handling_and_strict_wire_validation_tests": 36,
+    "error_handling_and_strict_wire_validation_tests": 42,
     "consumer_smoke_tests": 2
   },
   "checks": {

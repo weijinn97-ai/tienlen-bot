@@ -960,6 +960,32 @@ class AdversarialAuditTests(unittest.TestCase):
         with self.assertRaises(TypeError):
             contract_to_dict(ts)
 
+    def test_serialization_rejects_duck_typed_mapping(self) -> None:
+        """contract_to_dict and contract_to_json reject a fake mapping that only implements items()."""
+        class FakeCounts:
+            def items(self):
+                return [(SeatPosition.SELF, 5)]
+        ts = _sample_table_state()
+        object.__setattr__(ts, "player_card_counts", FakeCounts())
+        with self.assertRaises(TypeError):
+            contract_to_dict(ts)
+        with self.assertRaises(TypeError):
+            contract_to_json(ts)
+
+    def test_serialization_accepts_mapping_proxy_type(self) -> None:
+        """contract_to_dict and contract_to_json accept types.MappingProxyType as a valid Mapping."""
+        import types
+        ts = _sample_table_state()
+        object.__setattr__(ts, "player_card_counts", types.MappingProxyType({SeatPosition.SELF: 5}))
+        d = contract_to_dict(ts)
+        self.assertIn("0", d["payload"]["player_card_counts"])
+        j = contract_to_json(ts)
+        self.assertIn('"0":5', j.replace(" ", ""))
+
+        # Round trip
+        restored = contract_from_json(j)
+        self.assertEqual(restored.player_card_counts, {SeatPosition.SELF: 5})
+
 
 # -----------------------------------------------------------------------
 # Consumer smoke tests
