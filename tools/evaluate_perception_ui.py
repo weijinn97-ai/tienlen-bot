@@ -46,8 +46,12 @@ def main() -> None:
         print(f"Unexpected error loading bundle: {e}")
         sys.exit(3)
 
-    config = UiEvaluationConfig()
-    result = evaluate_ui_predictions(bundle, config)
+    try:
+        config = UiEvaluationConfig()
+        result = evaluate_ui_predictions(bundle, config)
+    except Exception as e:
+        print(f"Error during evaluation: {e}")
+        sys.exit(3)
 
     try:
         write_ui_evaluation_result(result, args.output)

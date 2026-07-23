@@ -39,13 +39,13 @@ class UiEvaluationTests(unittest.TestCase):
         csha = "b" * 64
         for i in range(num_records):
             fid = f"s{i%num_sessions:02d}-sq{i%num_seqs:02d}-f{i:04d}"
-            
+
             fi.append(UiFrameIndexRecord(
                 frame_id=fid, relative_path=f"frames/{fid}.png", sha256=hashlib.sha256(str(i).encode()).hexdigest(),
                 session_id=f"s{i%num_sessions:02d}", sequence_id=f"sq{i%num_seqs:02d}", frame_index=i,
                 split="test", review_status="APPROVED", reviewer_id="bot"
             ))
-            
+
             gt.append(UiGroundTruthRecord(
                 frame_id=fid,
                 buttons=MappingProxyType({"play": UiButtonState(False, False), "pass": UiButtonState(True, True)}),
@@ -54,7 +54,7 @@ class UiEvaluationTests(unittest.TestCase):
                 critical_transition=True,
                 negative_play_frame=True
             ))
-            
+
             pr.append(UiPredictionRecord(
                 frame_id=fid,
                 buttons=MappingProxyType({"play": UiPredictedButtonState(False, False, 0.99), "pass": UiPredictedButtonState(True, True, 0.99)}),
@@ -62,7 +62,7 @@ class UiEvaluationTests(unittest.TestCase):
                 turn_owner="SELF", turn_observed_frames=4, turn_matching_frames=3, turn_latest_frame_matches=True,
                 latency_ms=10.0, source_commit=sc, config_sha256=csha
             ))
-            
+
         return UiEvaluationBundle(
             "d1", locked, MappingProxyType({"width": 1280, "height": 720}), tuple(fi), tuple(gt), tuple(pr), MappingProxyType({})
         )
@@ -71,7 +71,7 @@ class UiEvaluationTests(unittest.TestCase):
         b = self._create_perfect_bundle(num_records=1999) # thieu 1
         res = evaluate_ui_predictions(b, UiEvaluationConfig())
         self.assertEqual(res.status, "INSUFFICIENT_DATA")
-        
+
     def test_2_sufficient_coverage_pass(self):
         b = self._create_perfect_bundle(num_records=2000)
         res = evaluate_ui_predictions(b, UiEvaluationConfig())
@@ -178,19 +178,19 @@ class UiEvaluationTests(unittest.TestCase):
         img_path.parent.mkdir(parents=True, exist_ok=True)
         self._make_png(img_path, 1280, 720)
         sha = hashlib.sha256(img_path.read_bytes()).hexdigest()
-        
+
         fi = [{"frame_id": fid, "relative_path": f"frames/{fid}.png", "sha256": sha, "session_id": "s01", "sequence_id": "sq01", "frame_index": 1, "split": "test", "review_status": "APPROVED", "reviewer_id": "b"}]
         gt = [{"frame_id": fid, "buttons": {"play": {"visible": False, "enabled": False}, "pass": {"visible": True, "enabled": True}}, "ocr_fields": [{"field_id": "f1", "expected_text": "13", "critical": True}], "expected_turn_owner": "SELF", "critical_transition": True, "negative_play_frame": True}]
         pr = [{"frame_id": fid, "buttons": {"play": {"visible": False, "enabled": False, "confidence": 0.99}, "pass": {"visible": True, "enabled": True, "confidence": 0.99}}, "ocr_fields": [{"field_id": "f1", "text": "13", "confidence": 0.99}], "turn_owner": "SELF", "turn_observed_frames": 4, "turn_matching_frames": 3, "turn_latest_frame_matches": True, "latency_ms": 10.0, "source_commit": "a"*40, "config_sha256": "b"*64}]
-        
+
         self._write_jsonl("fi.jsonl", fi)
         self._write_jsonl("gt.jsonl", gt)
         self._write_jsonl("pr.jsonl", pr)
-        
+
         s1 = hashlib.sha256((d/"fi.jsonl").read_bytes()).hexdigest()
         s2 = hashlib.sha256((d/"gt.jsonl").read_bytes()).hexdigest()
         s3 = hashlib.sha256((d/"pr.jsonl").read_bytes()).hexdigest()
-        
+
         bundle = {
             "schema_version": 1, "dataset_id": "t", "locked": True,
             "viewport": {"width": 1280, "height": 720},
@@ -212,7 +212,7 @@ class UiEvaluationTests(unittest.TestCase):
 
     def test_9_10_missing_duplicate_fails(self):
         b, fi, gt, pr = self._setup_fs_bundle()
-        
+
         pr.append(pr[0])
         self._write_jsonl("pr.jsonl", pr)
         b["sha256"]["pr.jsonl"] = hashlib.sha256((Path(self.tmp_dir)/"pr.jsonl").read_bytes()).hexdigest()
@@ -238,7 +238,7 @@ class UiEvaluationTests(unittest.TestCase):
         self._write_json("bundle.json", b)
         with self.assertRaises(ValueError):
             load_ui_evaluation_bundle(self.tmp_dir)
-            
+
         bad_json2 = '{"latency_ms": NaN}'
         (Path(self.tmp_dir) / "pr.jsonl").write_text(bad_json2, encoding="utf-8")
         b["sha256"]["pr.jsonl"] = hashlib.sha256((Path(self.tmp_dir)/"pr.jsonl").read_bytes()).hexdigest()
@@ -283,7 +283,7 @@ class UiEvaluationTests(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             load_ui_evaluation_bundle(self.tmp_dir)
         self.assertIn("not APPROVED", str(cm.exception))
-        
+
     def test_16_unlocked_bundle_never_pass(self):
         b = self._create_perfect_bundle(locked=False)
         res = evaluate_ui_predictions(b, UiEvaluationConfig())
@@ -294,36 +294,36 @@ class UiEvaluationTests(unittest.TestCase):
         cli = Path(__file__).parent.parent / "tools" / "evaluate_perception_ui.py"
         env = os.environ.copy()
         env["PYTHONPATH"] = str(Path(__file__).parent.parent)
-        
+
         out_dir = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, out_dir)
-        
+
         out1 = out_dir / "out1"
         res1 = subprocess.run([sys.executable, str(cli), "--bundle", self.tmp_dir, "--output", str(out1)], env=env)
         self.assertEqual(res1.returncode, 2)
-        
+
         out2 = out_dir / "out2"
         res2 = subprocess.run([sys.executable, str(cli), "--bundle", self.tmp_dir, "--output", str(out2)], env=env)
         self.assertEqual(res2.returncode, 2)
-        
+
         s1 = hashlib.sha256((out1 / "metrics.json").read_bytes()).hexdigest()
         s2 = hashlib.sha256((out2 / "metrics.json").read_bytes()).hexdigest()
         self.assertEqual(s1, s2)
-        
+
         f1 = hashlib.sha256((out1 / "failures.jsonl").read_bytes()).hexdigest()
         f2 = hashlib.sha256((out2 / "failures.jsonl").read_bytes()).hexdigest()
         self.assertEqual(f1, f2)
-        
+
         e1 = hashlib.sha256((out1 / "evaluated_manifest.json").read_bytes()).hexdigest()
         e2 = hashlib.sha256((out2 / "evaluated_manifest.json").read_bytes()).hexdigest()
         self.assertEqual(e1, e2)
-        
+
         # Make it FAIL
         pr[0]["buttons"]["play"]["enabled"] = True
         self._write_jsonl("pr.jsonl", pr)
         b["sha256"]["pr.jsonl"] = hashlib.sha256((Path(self.tmp_dir)/"pr.jsonl").read_bytes()).hexdigest()
         self._write_json("bundle.json", b)
-        
+
         out3 = out_dir / "out3"
         res3 = subprocess.run([sys.executable, str(cli), "--bundle", self.tmp_dir, "--output", str(out3)], env=env)
         self.assertEqual(res3.returncode, 1)
@@ -336,25 +336,25 @@ class UiEvaluationTests(unittest.TestCase):
         self._write_json("bundle.json", b)
         with self.assertRaises(ValueError):
             load_ui_evaluation_bundle(self.tmp_dir)
-            
+
         pr[0]["source_commit"] = "a"*40
         fi.append(fi[0].copy())
         gt.append(gt[0].copy())
         pr.append(pr[0].copy())
-        
+
         img2 = Path(self.tmp_dir) / "frames" / "f2.png"
         self._make_png(img2, 1280, 720, fill=128)
         sha2 = hashlib.sha256(img2.read_bytes()).hexdigest()
-        
+
         fi[1]["frame_id"] = "f2"
         fi[1]["relative_path"] = "frames/f2.png"
         fi[1]["sha256"] = sha2
         fi[1]["frame_index"] = 2
-        
+
         gt[1]["frame_id"] = "f2"
         pr[1]["frame_id"] = "f2"
         pr[1]["source_commit"] = "c"*40
-        
+
         self._write_jsonl("fi.jsonl", fi)
         self._write_jsonl("gt.jsonl", gt)
         self._write_jsonl("pr.jsonl", pr)
@@ -385,6 +385,11 @@ class UiEvaluationTests(unittest.TestCase):
         fi.append(fi[0].copy())
         fi[1]["frame_id"] = "f2"
         fi[1]["frame_index"] = 2
+        fi[1]["relative_path"] = "frames/f2.png"
+        img2 = Path(self.tmp_dir) / "frames" / "f2.png"
+        img1 = Path(self.tmp_dir) / "frames" / "s01-sq01-f001.png"
+        img2.write_bytes(img1.read_bytes())
+
         gt.append(gt[0].copy())
         gt[1]["frame_id"] = "f2"
         pr.append(pr[0].copy())
@@ -414,7 +419,7 @@ class UiEvaluationTests(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             load_ui_evaluation_bundle(self.tmp_dir)
         self.assertIn("Invalid turn_owner", str(cm.exception))
-        
+
         pr[0]["turn_owner"] = "SELF"
         del pr[0]["buttons"]["play"]
         self._write_jsonl("pr.jsonl", pr)
@@ -423,7 +428,7 @@ class UiEvaluationTests(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             load_ui_evaluation_bundle(self.tmp_dir)
         self.assertIn("missing keys", str(cm.exception))
-        
+
     def test_symlink_escape(self):
         b, fi, gt, pr = self._setup_fs_bundle()
         if os.name == 'nt':
@@ -453,7 +458,7 @@ class UiEvaluationTests(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             load_ui_evaluation_bundle(self.tmp_dir)
         self.assertIn("absolute", str(cm.exception))
-        
+
     def test_corrupt_image(self):
         b, fi, gt, pr = self._setup_fs_bundle()
         img = Path(self.tmp_dir) / "frames" / f"{fi[0]['frame_id']}.png"
@@ -569,6 +574,189 @@ class UiEvaluationTests(unittest.TestCase):
         with self.assertRaises(ValueError) as cm:
             load_ui_evaluation_bundle(self.tmp_dir)
         self.assertIn("OCR fields mismatch", str(cm.exception))
+
+
+    # ------------------------------------------------------------------ #
+    # Round 4 adversarial & regression tests                               #
+    # ------------------------------------------------------------------ #
+
+    def test_r4_01_config_frozen(self):
+        """UiEvaluationConfig must be frozen and raise FrozenInstanceError on mutation."""
+        from bot.perception.ui_evaluation import UiEvaluationConfig
+        import dataclasses
+        config = UiEvaluationConfig()
+        with self.assertRaises(dataclasses.FrozenInstanceError):
+            config.min_negative_play_frames = 0
+
+    def test_r4_02_manifest_contains_images(self):
+        """evaluated_manifest.json must record all consumed frame images in input_sha256."""
+        b, fi, gt, pr = self._setup_fs_bundle()
+        bundle = load_ui_evaluation_bundle(self.tmp_dir)
+        config = UiEvaluationConfig(min_test_frames=1, min_negative_play_frames=1, min_test_sessions=1, min_test_sequences=1)
+        res = evaluate_ui_predictions(bundle, config)
+        out_dir = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, out_dir)
+        write_ui_evaluation_result(res, out_dir)
+
+        manifest = json.loads((out_dir / "evaluated_manifest.json").read_text(encoding="utf-8"))
+        self.assertIn("input_sha256", manifest)
+        self.assertIn("frames/s01-sq01-f001.png", manifest["input_sha256"])
+        self.assertEqual(manifest["input_sha256"]["frames/s01-sq01-f001.png"], fi[0]["sha256"])
+
+    def test_r4_03_image_aliasing_rejected(self):
+        """Deduplicate image paths: relative paths cannot be reused in index."""
+        b, fi, gt, pr = self._setup_fs_bundle()
+        fi.append(fi[0].copy())
+        fi[1]["frame_id"] = "s01-sq01-f002"
+        fi[1]["frame_index"] = 2
+
+        self._write_jsonl("fi.jsonl", fi)
+        b["sha256"]["fi.jsonl"] = hashlib.sha256(
+            (Path(self.tmp_dir) / "fi.jsonl").read_bytes()
+        ).hexdigest()
+        self._write_json("bundle.json", b)
+
+        with self.assertRaises(ValueError) as cm:
+            load_ui_evaluation_bundle(self.tmp_dir)
+        self.assertIn("Duplicate or aliased image path", str(cm.exception))
+
+    def test_r4_04_logical_paths_must_be_distinct(self):
+        """Files in bundle.json must not reference the same file path."""
+        b, fi, gt, pr = self._setup_fs_bundle()
+        b["files"]["ground_truth"] = "fi.jsonl"
+        b["sha256"]["fi.jsonl"] = hashlib.sha256((Path(self.tmp_dir)/"fi.jsonl").read_bytes()).hexdigest()
+        self._write_json("bundle.json", b)
+        with self.assertRaises(ValueError) as cm:
+            load_ui_evaluation_bundle(self.tmp_dir)
+        self.assertIn("files paths must be distinct", str(cm.exception))
+
+    def test_r4_05_sequence_tuple_key(self):
+        """Ensure session/sequence keys do not collide (e.g. ('a_b', 'c') vs ('a', 'b_c'))."""
+        b, fi, gt, pr = self._setup_fs_bundle()
+        fi[0]["session_id"] = "a_b"
+        fi[0]["sequence_id"] = "c"
+        fi[0]["frame_index"] = 1
+
+        fi.append(fi[0].copy())
+        fi[1]["frame_id"] = "f2"
+        fi[1]["session_id"] = "a"
+        fi[1]["sequence_id"] = "b_c"
+        fi[1]["frame_index"] = 1
+        fi[1]["relative_path"] = "frames/f2.png"
+        self._make_png(Path(self.tmp_dir) / "frames" / "f2.png", 1280, 720, fill=10)
+        fi[1]["sha256"] = hashlib.sha256((Path(self.tmp_dir) / "frames" / "f2.png").read_bytes()).hexdigest()
+
+        gt.append(gt[0].copy())
+        gt[1]["frame_id"] = "f2"
+        pr.append(pr[0].copy())
+        pr[1]["frame_id"] = "f2"
+
+        self._write_jsonl("fi.jsonl", fi)
+        self._write_jsonl("gt.jsonl", gt)
+        self._write_jsonl("pr.jsonl", pr)
+        b["sha256"]["fi.jsonl"] = hashlib.sha256((Path(self.tmp_dir)/"fi.jsonl").read_bytes()).hexdigest()
+        b["sha256"]["gt.jsonl"] = hashlib.sha256((Path(self.tmp_dir)/"gt.jsonl").read_bytes()).hexdigest()
+        b["sha256"]["pr.jsonl"] = hashlib.sha256((Path(self.tmp_dir)/"pr.jsonl").read_bytes()).hexdigest()
+        self._write_json("bundle.json", b)
+
+        load_ui_evaluation_bundle(self.tmp_dir)
+
+    def test_r4_06_public_immutability(self):
+        """Ensure direct callers cannot mutate passed collections after bundle/record instantiation."""
+        from bot.perception.ui_evaluation import UiEvaluationBundle, UiGroundTruthRecord
+
+        buttons = {"play": UiButtonState(True, True)}
+        ocr = [UiOcrField("f1", "val", True)]
+        gt = UiGroundTruthRecord("fid", buttons, ocr, "SELF", True, False)
+
+        buttons["play"] = UiButtonState(False, False)
+        ocr.append(UiOcrField("f2", "val2", False))
+
+        self.assertIsInstance(gt.buttons, MappingProxyType)
+        self.assertEqual(gt.buttons["play"].visible, True)
+        self.assertEqual(len(gt.ocr_fields), 1)
+
+        viewport = {"width": 100, "height": 100}
+        bundle = UiEvaluationBundle("d1", True, viewport, (), (gt,), (), {})
+
+        viewport["width"] = 200
+        self.assertEqual(bundle.viewport["width"], 100)
+
+    def test_r4_07_cli_all_exit_codes(self):
+        """Test evaluate_perception_ui.py CLI tool exit codes 0, 1, 2, 3."""
+        b, fi, gt, pr = self._setup_fs_bundle()
+        cli = Path(__file__).parent.parent / "tools" / "evaluate_perception_ui.py"
+        env = os.environ.copy()
+        env["PYTHONPATH"] = str(Path(__file__).parent.parent)
+
+        out_dir = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, out_dir)
+
+        res = subprocess.run([sys.executable, str(cli), "--bundle", self.tmp_dir, "--output", str(out_dir / "out2")], env=env)
+        self.assertEqual(res.returncode, 2)
+
+        pr[0]["buttons"]["play"]["visible"] = True
+        pr[0]["buttons"]["play"]["enabled"] = True
+        self._write_jsonl("pr.jsonl", pr)
+        b["sha256"]["pr.jsonl"] = hashlib.sha256((Path(self.tmp_dir)/"pr.jsonl").read_bytes()).hexdigest()
+        self._write_json("bundle.json", b)
+        res = subprocess.run([sys.executable, str(cli), "--bundle", self.tmp_dir, "--output", str(out_dir / "out1")], env=env)
+        self.assertEqual(res.returncode, 1)
+
+        res = subprocess.run([sys.executable, str(cli), "--bundle", str(out_dir), "--output", str(out_dir / "out3")], env=env)
+        self.assertEqual(res.returncode, 3)
+
+        script = out_dir / "run_pass.py"
+        script.write_text(f"""
+import sys
+from pathlib import Path
+sys.path.insert(0, r'{str(Path(__file__).parent.parent)}')
+from bot.perception import ui_evaluation
+import tools.evaluate_perception_ui
+ui_evaluation.DEFAULT_CONFIG = ui_evaluation.UiEvaluationConfig(
+    min_test_frames=1, min_negative_play_frames=1, min_test_sessions=1, min_test_sequences=1
+)
+tools.evaluate_perception_ui.UiEvaluationConfig = lambda *args, **kwargs: ui_evaluation.DEFAULT_CONFIG
+from tools.evaluate_perception_ui import main
+sys.argv = ['evaluate_perception_ui.py', '--bundle', r'{self.tmp_dir}', '--output', r'{str(out_dir / "out0")}']
+main()
+""", encoding="utf-8")
+        pr[0]["buttons"]["play"]["visible"] = False
+        pr[0]["buttons"]["play"]["enabled"] = False
+        self._write_jsonl("pr.jsonl", pr)
+        b["sha256"]["pr.jsonl"] = hashlib.sha256((Path(self.tmp_dir)/"pr.jsonl").read_bytes()).hexdigest()
+        self._write_json("bundle.json", b)
+
+        res = subprocess.run([sys.executable, str(script)], env=env)
+        self.assertEqual(res.returncode, 0)
+
+    def test_r4_08_load_jsonl_limits(self):
+        """Ensure _load_jsonl rejects files with too many records or oversized rows."""
+        from bot.perception.ui_evaluation import _load_jsonl
+        p = Path(self.tmp_dir) / "limit_test.jsonl"
+
+        p.write_text("{}\n{}\n{}\n", encoding="utf-8")
+        with self.assertRaises(ValueError) as cm:
+            _load_jsonl(p, _max_records=2)
+        self.assertIn("Too many lines", str(cm.exception))
+
+        p.write_text("{" + "a" * (1024 * 1024 + 1) + "}\n", encoding="utf-8")
+        with self.assertRaises(ValueError) as cm:
+            _load_jsonl(p)
+        self.assertIn("exceeds max length", str(cm.exception))
+
+    def test_r4_09_id_validation(self):
+        """Ensure _is_safe_id rejects whitespace, path punctuation, and oversized strings."""
+        from bot.perception.ui_evaluation import _is_safe_id
+
+        self.assertTrue(_is_safe_id("valid-123_ID.name"))
+
+        self.assertFalse(_is_safe_id("id with spaces"))
+        self.assertFalse(_is_safe_id("id/with/slashes"))
+        self.assertFalse(_is_safe_id("id\\with\\backslashes"))
+        self.assertFalse(_is_safe_id("id:with:colons"))
+        self.assertFalse(_is_safe_id("a" * 129))
+        self.assertFalse(_is_safe_id(""))
 
 
 if __name__ == '__main__':

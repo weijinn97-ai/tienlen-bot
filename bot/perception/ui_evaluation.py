@@ -1,11 +1,10 @@
-"""Deterministic evaluator for perception UI."""
-
 import json
 import math
 import hashlib
 import os
 import tempfile
 import time
+import re
 from dataclasses import dataclass
 from typing import Any, Optional, Mapping, Tuple
 from pathlib import Path
@@ -58,6 +57,10 @@ class UiGroundTruthRecord:
     critical_transition: bool
     negative_play_frame: bool
 
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "buttons", MappingProxyType(dict(self.buttons)))
+        object.__setattr__(self, "ocr_fields", tuple(self.ocr_fields))
+
 
 @dataclass(frozen=True)
 class UiPredictionRecord:
@@ -71,6 +74,10 @@ class UiPredictionRecord:
     latency_ms: float
     source_commit: str
     config_sha256: str
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "buttons", MappingProxyType(dict(self.buttons)))
+        object.__setattr__(self, "ocr_fields", tuple(self.ocr_fields))
 
 
 @dataclass(frozen=True)
@@ -96,8 +103,15 @@ class UiEvaluationBundle:
     predictions: Tuple[UiPredictionRecord, ...]
     input_sha256: Mapping[str, str]
 
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "viewport", MappingProxyType(dict(self.viewport)))
+        object.__setattr__(self, "frame_index", tuple(self.frame_index))
+        object.__setattr__(self, "ground_truth", tuple(self.ground_truth))
+        object.__setattr__(self, "predictions", tuple(self.predictions))
+        object.__setattr__(self, "input_sha256", MappingProxyType(dict(self.input_sha256)))
 
-@dataclass
+
+@dataclass(frozen=True)
 class UiEvaluationConfig:
     ocr_confidence_threshold: float = 0.75
     min_test_frames: int = 1
@@ -188,6 +202,12 @@ class UiEvaluationResult:
     effective_thresholds: Mapping[str, Any]
     record_counts: Mapping[str, int]
 
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "failures", tuple(self.failures))
+        object.__setattr__(self, "input_sha256", MappingProxyType(dict(self.input_sha256)))
+        object.__setattr__(self, "effective_thresholds", MappingProxyType(dict(self.effective_thresholds)))
+        object.__setattr__(self, "record_counts", MappingProxyType(dict(self.record_counts)))
+
 
 def _reject_duplicate_json_keys(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
     res: dict[str, Any] = {}
@@ -214,22 +234,33 @@ def _load_json(path: Path) -> Any:
         raise ValueError(f"Invalid JSON in {path.name}: {e}")
 
 
-def _load_jsonl(path: Path) -> list[Any]:
-    res = []
+def _load_jsonl(path: Path, _max_records: int = 500000) -> list[Any]:
+    max_file_size = 200 * 1024 * 1024
     try:
-        lines = path.read_text(encoding="utf-8").splitlines()
-        if len(lines) > 500000:
-            raise ValueError(f"Too many lines in {path.name}")
-        for line in lines:
-            line = line.strip()
-            if not line:
-                continue
-            obj = json.loads(
-                line,
-                parse_constant=_reject_json_constant,
-                object_pairs_hook=_reject_duplicate_json_keys,
-            )
-            res.append(obj)
+        file_size = path.stat().st_size
+    except Exception as e:
+        raise ValueError(f"Cannot access file size of {path.name}: {e}")
+    if file_size > max_file_size:
+        raise ValueError(f"File {path.name} exceeds size limit of {max_file_size} bytes")
+
+    res = []
+    max_line_len = 1024 * 1024
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            for idx, line in enumerate(f):
+                if idx >= _max_records:
+                    raise ValueError(f"Too many lines in {path.name} (exceeded {_max_records} limit)")
+                if len(line) > max_line_len:
+                    raise ValueError(f"Line {idx + 1} in {path.name} exceeds max length of {max_line_len}")
+                line_stripped = line.strip()
+                if not line_stripped:
+                    continue
+                obj = json.loads(
+                    line_stripped,
+                    parse_constant=_reject_json_constant,
+                    object_pairs_hook=_reject_duplicate_json_keys,
+                )
+                res.append(obj)
     except Exception as e:
         raise ValueError(f"Invalid JSONL in {path.name}: {e}")
     return res
@@ -266,9 +297,10 @@ def _require_finite_float(v: Any, name: str) -> float:
 
 
 def _is_safe_id(val: str) -> bool:
-    if not val:
+    # Documented ASCII allowlist: [A-Za-z0-9._-]+ with max length 128
+    if not val or len(val) > 128:
         return False
-    return not any(ord(c) < 32 or ord(c) > 126 for c in val)
+    return bool(re.match(r"^[A-Za-z0-9._-]+$", val))
 
 
 def _is_valid_hex(val: str, length: int) -> bool:
@@ -296,7 +328,7 @@ def _validate_path(rel_path: str, base: Path, resolved_paths: dict[str, str]) ->
         full_path.relative_to(base.resolve())
     except ValueError:
         raise ValueError(f"Escape path detected: {rel_path}")
-    
+
     canonical = str(full_path).lower()
     if canonical in resolved_paths and resolved_paths[canonical] != rel_path:
         raise ValueError(f"Path collision detected: {rel_path} and {resolved_paths[canonical]}")
@@ -327,7 +359,7 @@ def load_ui_evaluation_bundle(bundle_dir: str) -> UiEvaluationBundle:
     bundle_json_path = base / "bundle.json"
     if not bundle_json_path.exists():
         raise ValueError("Missing bundle.json")
-    
+
     b = _load_json(bundle_json_path)
     _require_keys(b, {"schema_version", "dataset_id", "locked", "viewport", "files", "sha256"}, "bundle.json")
     if _require_type(b["schema_version"], int, "schema_version") != 1:
@@ -336,7 +368,7 @@ def load_ui_evaluation_bundle(bundle_dir: str) -> UiEvaluationBundle:
     if not _is_safe_id(dataset_id):
         raise ValueError("Invalid dataset_id")
     locked = _require_type(b["locked"], bool, "locked")
-    
+
     vp_raw = _require_type(b["viewport"], dict, "viewport")
     _require_keys(vp_raw, {"width", "height"}, "viewport")
     vp = {
@@ -348,35 +380,38 @@ def load_ui_evaluation_bundle(bundle_dir: str) -> UiEvaluationBundle:
 
     files_dict = _require_type(b["files"], dict, "files")
     _require_keys(files_dict, {"frame_index", "ground_truth", "predictions"}, "files")
-    
+    # Require three distinct logical file paths
+    if len(set(files_dict.values())) != 3:
+        raise ValueError("files paths must be distinct")
+
     sha256_dict = _require_type(b["sha256"], dict, "sha256")
     if set(files_dict.values()) != set(sha256_dict.keys()):
         raise ValueError("sha256 keys must exactly match files values")
 
     resolved_paths: dict[str, str] = {}
-    
+
     loaded_data = {}
     input_sha256 = {}
-    
+
     for key, expected_filename in files_dict.items():
         _require_type(expected_filename, str, f"files.{key}")
         file_path = _validate_path(expected_filename, base, resolved_paths)
-        
+
         expected_sha = sha256_dict[expected_filename]
         if type(expected_sha) is not str or not _is_valid_hex(expected_sha, 64):
             raise ValueError(f"Missing or invalid sha256 for {expected_filename}")
-        
+
         actual_sha = hashlib.sha256(file_path.read_bytes()).hexdigest()
         if actual_sha != expected_sha:
             raise ValueError(f"Checksum mismatch for {expected_filename}: expected {expected_sha}, got {actual_sha}")
-        
+
         input_sha256[expected_filename] = actual_sha
         loaded_data[key] = _load_jsonl(file_path)
 
     frame_index = []
     seen_frame_ids = set()
-    last_seq_idx: dict[str, int] = {}
-    
+    last_seq_idx: dict[Tuple[str, str], int] = {}
+
     for row in loaded_data["frame_index"]:
         _require_keys(row, {"frame_id", "relative_path", "sha256", "session_id", "sequence_id", "frame_index", "split", "review_status", "reviewer_id"}, "frame_index row")
         fid = _require_type(row["frame_id"], str, "frame_id")
@@ -385,44 +420,51 @@ def load_ui_evaluation_bundle(bundle_dir: str) -> UiEvaluationBundle:
         if fid in seen_frame_ids:
             raise ValueError(f"Duplicate frame_id in index: {fid}")
         seen_frame_ids.add(fid)
-        
+
         rel_path = _require_type(row["relative_path"], str, "relative_path")
+
+        # Deduplicate and register relative path in input_sha256
+        if rel_path in input_sha256:
+            raise ValueError(f"Duplicate or aliased image path: {rel_path}")
+
         full_path = _validate_path(rel_path, base, resolved_paths)
-        
+
         sha = _require_type(row["sha256"], str, "sha256")
         if not _is_valid_hex(sha, 64):
             raise ValueError("Invalid image sha256")
-        
+
+        input_sha256[rel_path] = sha
+
         # Verify image
         _verify_image(full_path, sha, vp["width"], vp["height"])
-        
+
         split = _require_type(row["split"], str, "split")
         if split not in ("train", "val", "test"):
             raise ValueError(f"Invalid split: {split}")
-        
+
         r_status = _require_type(row["review_status"], str, "review_status")
         if split == "test" and r_status != "APPROVED":
             raise ValueError(f"Test frame {fid} not APPROVED")
-        
+
         r_id = _require_type(row["reviewer_id"], str, "reviewer_id")
         if split == "test" and not _is_safe_id(r_id):
             raise ValueError("Invalid reviewer_id")
-            
+
         sid = _require_type(row["session_id"], str, "session_id")
         seqid = _require_type(row["sequence_id"], str, "sequence_id")
         if not _is_safe_id(sid) or not _is_safe_id(seqid):
             raise ValueError("Invalid session_id or sequence_id")
-            
+
         f_idx = _require_type(row["frame_index"], int, "frame_index")
         if f_idx < 0:
             raise ValueError("frame_index must be nonnegative")
-            
-        seq_key = f"{sid}_{seqid}"
+
+        seq_key = (sid, seqid)
         if seq_key in last_seq_idx:
             if f_idx <= last_seq_idx[seq_key]:
                 raise ValueError("frame_index must be strictly increasing per sequence")
         last_seq_idx[seq_key] = f_idx
-        
+
         frame_index.append(UiFrameIndexRecord(
             frame_id=fid,
             relative_path=rel_path,
@@ -477,7 +519,7 @@ def load_ui_evaluation_bundle(bundle_dir: str) -> UiEvaluationBundle:
             eto = _require_type(eto, str, "expected_turn_owner")
             if eto not in ("SELF", "LEFT", "TOP", "RIGHT"):
                 raise ValueError(f"Invalid expected_turn_owner: {eto}")
-        
+
         ground_truth.append(UiGroundTruthRecord(
             frame_id=fid,
             buttons=MappingProxyType(buttons),
@@ -516,7 +558,7 @@ def load_ui_evaluation_bundle(bundle_dir: str) -> UiEvaluationBundle:
                 enabled=_require_type(b_dict["enabled"], bool, "enabled"),
                 confidence=conf
             )
-        
+
         ocr_fields = []
         ocr_ids = set()
         for ocr_raw in _require_type(row["ocr_fields"], list, "ocr_fields"):
@@ -547,7 +589,7 @@ def load_ui_evaluation_bundle(bundle_dir: str) -> UiEvaluationBundle:
             to = _require_type(to, str, "turn_owner")
             if to not in ("SELF", "LEFT", "TOP", "RIGHT"):
                 raise ValueError(f"Invalid turn_owner: {to}")
-                
+
         obs = _require_type(row["turn_observed_frames"], int, "turn_observed_frames")
         mat = _require_type(row["turn_matching_frames"], int, "turn_matching_frames")
         if not (0 <= mat <= obs):
@@ -634,13 +676,13 @@ def _validate_config(config: UiEvaluationConfig) -> bool:
 def evaluate_ui_predictions(bundle: UiEvaluationBundle, config: UiEvaluationConfig) -> UiEvaluationResult:
     meets_prod_thresholds = _validate_config(config)
     failures = []
-    
+
     index_map = {r.frame_id: r for r in bundle.frame_index}
     gt_map = {r.frame_id: r for r in bundle.ground_truth}
     pred_map = {r.frame_id: r for r in bundle.predictions}
 
     test_frame_ids = [fid for fid, rec in index_map.items() if rec.split == "test"]
-    
+
     test_sessions = len(set(index_map[fid].session_id for fid in test_frame_ids))
     test_sequences = len(set(f"{index_map[fid].session_id}_{index_map[fid].sequence_id}" for fid in test_frame_ids))
     unique_sha256 = len(set(index_map[fid].sha256 for fid in test_frame_ids))
@@ -665,7 +707,7 @@ def evaluate_ui_predictions(bundle: UiEvaluationBundle, config: UiEvaluationConf
     for fid in test_frame_ids:
         gt = gt_map[fid]
         pr = pred_map[fid]
-        
+
         latencies.append(pr.latency_ms)
 
         for b_name in ("play", "pass"):
@@ -674,7 +716,7 @@ def evaluate_ui_predictions(bundle: UiEvaluationBundle, config: UiEvaluationConf
                 button_state_correct += 1
             else:
                 failures.append(UiFailureRecord(fid, "BUTTON_MISMATCH", f"{b_name} expected {gt.buttons[b_name]}, got {pr.buttons[b_name]}"))
-        
+
         if gt.negative_play_frame:
             negative_play_frames += 1
             if pr.buttons["play"].visible and pr.buttons["play"].enabled:
@@ -698,18 +740,18 @@ def evaluate_ui_predictions(bundle: UiEvaluationBundle, config: UiEvaluationConf
                     critical_ocr_correct += 1
                 else:
                     failures.append(UiFailureRecord(fid, "CRITICAL_OCR_MISMATCH", f"Field {oid} expected {gt_o.expected_text!r}, got {pr_o.text!r}"))
-        
+
         if gt.expected_turn_owner is not None:
             turn_total += 1
             if pr.turn_owner == gt.expected_turn_owner:
                 turn_exact += 1
             else:
                 failures.append(UiFailureRecord(fid, "TURN_MISMATCH", f"Expected {gt.expected_turn_owner}, got {pr.turn_owner}"))
-        
+
         if pr.turn_owner == "SELF" and gt.expected_turn_owner != "SELF":
             false_my_turn += 1
             failures.append(UiFailureRecord(fid, "FALSE_MY_TURN", f"Falsely claimed turn ownership. Expected: {gt.expected_turn_owner}"))
-        
+
         if gt.critical_transition:
             critical_turn_total += 1
             if pr.turn_owner is not None:
