@@ -1,0 +1,2 @@
+py -3 tools/evaluate_perception_ui.py --bundle <bundle-dir> --output <output-dir>
+py -3 -c "import hashlib, pathlib; print('\n'.join(f'{hashlib.sha256(p.read_bytes()).hexdigest()} *{p.name}' for p in pathlib.Path('.').glob('*') if p.name != 'artifacts.sha256' and p.is_file()))" > artifacts.sha256

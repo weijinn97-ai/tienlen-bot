@@ -26,6 +26,24 @@ from bot.perception.buttons import (
 from bot.perception.yolo_cards import YoloCardConfigurationError, YoloCardDetector
 from bot.perception.ocr import OcrConfigurationError, OcrText, TesseractOcr
 from bot.perception.fan_cards import FanCardTemplateRecognizer, FanGeometry
+from bot.perception.ui_evaluation import (
+    UiEvaluationStatus,
+    UiButtonState,
+    UiPredictedButtonState,
+    UiOcrField,
+    UiPredictedOcrField,
+    UiGroundTruthRecord,
+    UiPredictionRecord,
+    UiFrameIndexRecord,
+    UiEvaluationBundle,
+    UiEvaluationConfig,
+    UiFailureRecord,
+    UiMetrics,
+    UiEvaluationResult,
+    load_ui_evaluation_bundle,
+    evaluate_ui_predictions,
+    write_ui_evaluation_result,
+)
 
 __all__ = [
     "DEFAULT_AVATAR_LAYOUT",
@@ -52,4 +70,20 @@ __all__ = [
     "YoloCardConfigurationError",
     "YoloCardDetector",
     "load_gameplay_button_detector",
+    "UiEvaluationStatus",
+    "UiButtonState",
+    "UiPredictedButtonState",
+    "UiOcrField",
+    "UiPredictedOcrField",
+    "UiGroundTruthRecord",
+    "UiPredictionRecord",
+    "UiFrameIndexRecord",
+    "UiEvaluationBundle",
+    "UiEvaluationConfig",
+    "UiFailureRecord",
+    "UiMetrics",
+    "UiEvaluationResult",
+    "load_ui_evaluation_bundle",
+    "evaluate_ui_predictions",
+    "write_ui_evaluation_result",
 ]

@@ -1,0 +1,6 @@
+{
+  "status": "INSUFFICIENT_DATA",
+  "reason": "Production dataset lacks minimum required locked frames",
+  "test_frames_available": 0,
+  "test_frames_required": 2000
+}
