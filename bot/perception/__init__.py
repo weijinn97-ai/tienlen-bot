@@ -44,6 +44,19 @@ from bot.perception.ui_evaluation import (
     evaluate_ui_predictions,
     write_ui_evaluation_result,
 )
+from bot.perception.ui_inference_runner import (
+    load_ui_inference_source,
+    load_ui_inference_config,
+    run_ui_inference,
+    write_ui_inference_result,
+    UiInferenceSource,
+    UiInferenceConfig,
+    UiInferenceResult,
+    UiInferenceFrameRecord,
+    OcrFieldConfig,
+    NormalizedOcrRoi,
+    ButtonTemplateConfig,
+)
 
 __all__ = [
     "DEFAULT_AVATAR_LAYOUT",
@@ -86,4 +99,15 @@ __all__ = [
     "load_ui_evaluation_bundle",
     "evaluate_ui_predictions",
     "write_ui_evaluation_result",
+    "load_ui_inference_source",
+    "load_ui_inference_config",
+    "run_ui_inference",
+    "write_ui_inference_result",
+    "UiInferenceSource",
+    "UiInferenceConfig",
+    "UiInferenceResult",
+    "UiInferenceFrameRecord",
+    "OcrFieldConfig",
+    "NormalizedOcrRoi",
+    "ButtonTemplateConfig",
 ]
