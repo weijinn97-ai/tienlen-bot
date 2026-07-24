@@ -1,16 +1,19 @@
 from __future__ import annotations
 
 import os
+import base64
 from pathlib import Path
 from queue import Empty, Queue
 import subprocess
 import sys
-from threading import Thread
+from threading import Event, Thread
 import tkinter as tk
 from tkinter import messagebox, ttk
 
 from bot.discovery.adb_discovery import BindingCandidate, scan_memu_adb_bindings
+from bot.capture.windows_capture import WindowsCapture
 from bot.ui.process_control import creation_flags, force_stop, request_graceful_stop
+from bot.ui.preview import frame_to_ppm
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -33,6 +36,10 @@ class BotLauncherApp:
         self.process_reader: Thread | None = None
         self.selected_vm_index: int | None = None
         self._stop_callback = None
+        self.preview_stop = Event()
+        self.preview_queue: Queue[bytes] = Queue(maxsize=1)
+        self.preview_thread: Thread | None = None
+        self.preview_image = None
 
         self.status_var = tk.StringVar(value="Ready")
         self.selected_var = tk.StringVar(value="No emulator selected")
@@ -84,6 +91,12 @@ class BotLauncherApp:
         ttk.Button(action_bar, text="Stop Bot", command=self.stop_bot).pack(
             side=tk.LEFT, padx=(8, 0)
         )
+        ttk.Button(action_bar, text="Start Preview", command=self.start_preview).pack(
+            side=tk.LEFT, padx=(8, 0)
+        )
+        ttk.Button(action_bar, text="Stop Preview", command=self.stop_preview).pack(
+            side=tk.LEFT, padx=(8, 0)
+        )
         ttk.Button(
             action_bar,
             text="Copy Binding Stub",
@@ -101,6 +114,16 @@ class BotLauncherApp:
         bottom_panel = ttk.Frame(content)
         content.add(top_panel, weight=3)
         content.add(bottom_panel, weight=2)
+
+        self.preview_label = tk.Label(
+            top_panel,
+            text="Preview stopped",
+            bg="#111418",
+            fg="#e7f2ec",
+            width=42,
+            height=16,
+        )
+        self.preview_label.pack(side=tk.RIGHT, fill=tk.Y, padx=(8, 0))
 
         self.tree = ttk.Treeview(
             top_panel,
@@ -288,6 +311,81 @@ class BotLauncherApp:
     def clear_log(self) -> None:
         self.log_text.delete("1.0", tk.END)
 
+    def start_preview(self) -> None:
+        candidate = self._selected_candidate()
+        if candidate is None:
+            messagebox.showwarning("No selection", "Choose one emulator instance first.")
+            return
+        if self.preview_thread is not None and self.preview_thread.is_alive():
+            self._append_log("INFO", "Preview is already running.")
+            return
+        if candidate.hwnd is None:
+            messagebox.showerror("Preview unavailable", "Selected emulator has no window handle.")
+            return
+
+        try:
+            capture = WindowsCapture(hwnd=candidate.hwnd)
+        except Exception as exc:
+            messagebox.showerror("Preview unavailable", str(exc))
+            return
+
+        self.preview_stop.clear()
+        self.preview_thread = Thread(
+            target=self._capture_preview_loop,
+            args=(capture,),
+            name="launcher-preview",
+            daemon=True,
+        )
+        self.preview_thread.start()
+        self.preview_label.configure(text="Starting preview...")
+        self._append_log("INFO", f"Live preview started for '{self._candidate_title(candidate)}'.")
+        self.root.after(100, self._drain_preview_queue)
+
+    def stop_preview(self) -> None:
+        if self.preview_thread is None or not self.preview_thread.is_alive():
+            self.preview_label.configure(text="Preview stopped", image="")
+            return
+        self.preview_stop.set()
+        self.preview_thread.join(timeout=1)
+        self.preview_thread = None
+        self.preview_image = None
+        self.preview_label.configure(text="Preview stopped", image="")
+        self._append_log("INFO", "Live preview stopped.")
+
+    def _capture_preview_loop(self, capture: WindowsCapture) -> None:
+        while not self.preview_stop.is_set():
+            try:
+                image = frame_to_ppm(capture.capture_frame())
+                try:
+                    self.preview_queue.put_nowait(image)
+                except Exception:
+                    try:
+                        self.preview_queue.get_nowait()
+                    except Empty:
+                        pass
+                    self.preview_queue.put_nowait(image)
+            except Exception as exc:
+                self._append_log("ERROR", f"Preview capture failed: {exc}")
+                self.preview_stop.set()
+                return
+            self.preview_stop.wait(0.2)
+
+    def _drain_preview_queue(self) -> None:
+        try:
+            image_data = None
+            while True:
+                image_data = self.preview_queue.get_nowait()
+        except Empty:
+            if image_data is not None:
+                self.preview_image = tk.PhotoImage(
+                    data=base64.b64encode(image_data).decode("ascii"),
+                    format="PPM",
+                )
+                self.preview_label.configure(image=self.preview_image, text="")
+        finally:
+            if self.preview_thread is not None and self.preview_thread.is_alive():
+                self.root.after(100, self._drain_preview_queue)
+
     def _selected_candidate(self) -> BindingCandidate | None:
         selection = self.tree.selection()
         if not selection:
@@ -378,6 +476,7 @@ class BotLauncherApp:
             callback()
 
     def _on_close(self) -> None:
+        self.stop_preview()
         if self.process is not None and self.process.poll() is None:
             if not messagebox.askyesno(
                 "Exit launcher",
