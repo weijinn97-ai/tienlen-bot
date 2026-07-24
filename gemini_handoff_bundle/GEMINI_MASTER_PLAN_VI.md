@@ -137,3 +137,8 @@ The current dataset remains `BLOCKED_ON_DATA`: it has only the legacy 36
 `MY_HAND` images, no production annotations, no real validation/test split,
 and no locked UI-negative set. No agent may train or claim production
 qualification until the checklist in `docs/TRAINING_PLAN_FINAL.md` is complete.
+
+`GEMINI-PERCEPTION-UI-01B` delivery is complete and its task policy is now
+`PAUSED_FOR_OWNER_REVIEW`. Gemini must stop when `guard_scope.ps1` reports
+that no ACTIVE task is authorized. A new Gemini coding task requires a new
+owner-approved policy and baseline; agents must not reactivate this policy.

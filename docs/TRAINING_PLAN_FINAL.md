@@ -16,11 +16,11 @@ The required dataset is split into independent purposes:
 | New production images | 3,000 | Hand, table, UI and OCR coverage | Yes, after annotation QA |
 | New production images | 5,000 target | Preferred coverage and diversity | Yes, after annotation QA |
 | Legacy images | 36 | Existing `MY_HAND` images | Yes, train only |
-| Locked UI negatives | 2,000 | UI safety evaluation only | No |
+| Locked UI negatives | 2,000 minimum | UI safety evaluation only | No |
 
-The 2,000 UI-negative frames are a separate locked test set. They must not be
-counted as card-detector training images and must not be mixed into the card
-validation set.
+At least 2,000 UI-negative frames are required. Exactly 2,000 must be selected
+as the checksum-locked release test set. They must not be counted as
+card-detector training images or mixed into the card validation set.
 
 The 3,000-5,000 new production images must contain both `MY_HAND` and
 `TABLE_PLAY`, plus real UI states and OCR fields where present. The dataset
@@ -46,6 +46,10 @@ PRESENT, MISSING, INVALID, NOT_REQUIRED
 Do not use `APPROVED`, `approved`, `pending`, `rejected`, or other aliases in
 the inventory. If an external labeling tool uses `approved`, map it to
 `PRESENT` at import time and record the original value in the QA notes.
+
+This rule applies to `inventory.csv` only. The locked UI replay bundle has a
+separate `review_status` field, where `APPROVED` remains the required value
+for reviewed test frames. Never merge these two schemas.
 
 `NOT_REQUIRED` is only valid for explicitly non-card assets such as UI safety
 negative frames. It must never hide a missing card annotation.
@@ -86,6 +90,8 @@ Rules:
 - Every class present in the production scope must be represented in train,
   validation, and card test, unless the manifest explicitly records a reviewed
   exception and blocks training.
+- A card-test split is mandatory. If it is absent, empty, or not independently
+  locked, training is blocked.
 - The locked UI-negative test must contain at least 5 sessions and 50
   independent sequences.
 - The 36 legacy images remain train-only.
@@ -121,6 +127,11 @@ For UI-negative frames, record an explicit state such as
 `play_disabled`, `pass_disabled`, `popup`, `animation`, or `outside_table`,
 and require `play_enabled=false`. These are safety labels, not card labels.
 
+The UI-negative manifest must contain at least
+`asset_id,session_id,sequence_id,ui_state,play_enabled,review_status,reviewer_id`.
+Every locked test row must have `play_enabled=false` and
+`review_status=APPROVED`.
+
 ## 6. Mandatory QA Before Training
 
 - Review 100% of validation and test annotations with a second reviewer.
@@ -129,7 +140,7 @@ and require `play_enabled=false`. These are safety labels, not card labels.
   image-label pairs, and duplicate/leaked groups.
 - Review confusion pairs `S/C`, `D/H`, `6/9`, `10/J`, and red-card color
   changes.
-- Verify the 2,000 UI-negative frames contain zero `play_enabled` ground-truth
+- Verify the locked UI-negative frames contain zero `play_enabled` ground-truth
   records.
 - Produce `annotation_review.csv`, inventory, split manifest, coverage report,
   and SHA-256 checksums.
@@ -222,7 +233,8 @@ metrics, worst classes, exact-state metrics, latency, and known limitations.
 - [ ] At least 3,000 new production images collected.
 - [ ] `MY_HAND` and `TABLE_PLAY` coverage is present.
 - [ ] All 36 legacy images annotated and kept in `legacy_36_unknown` train group.
-- [ ] Exactly 2,000 distinct UI-negative test frames reserved.
+- [ ] At least 2,000 distinct UI-negative frames collected; exactly 2,000 are
+  selected and checksum-locked for the release test.
 - [ ] UI negatives cover at least 5 sessions and 50 sequences.
 - [ ] Canonical inventory statuses are used.
 - [ ] Real train/val/card-test splits exist; no “if available” test split.

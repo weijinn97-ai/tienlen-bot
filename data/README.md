@@ -1,8 +1,15 @@
 # Data Directory
 
-This directory contains all the images and labels used for training the YOLOv8 model for card recognition. The goal is to maintain a centralized, version-controlled dataset that can be easily updated and utilized by all contributors and agents.
+This directory contains dataset intake metadata and a small legacy/bootstrap
+sample. It is not the production training store. Production raw images,
+labels, runs, and model weights must remain on the approved external storage
+workspace and be referenced from Git by manifests and SHA-256 checksums.
 
 ## Structure
+
+The `images/` and `labels/` layout below describes the external training
+workspace. The repository may retain historical/bootstrap samples, but new
+production binaries must not be added here.
 
 *   `images/`: Contains all the raw image files (e.g., screenshots from MEmu Player).
     *   `train/`: Images specifically for training.
@@ -12,8 +19,8 @@ This directory contains all the images and labels used for training the YOLOv8 m
     *   `train/`: Labels for training images.
     *   `val/`: Labels for validation images.
     *   `test/`: Labels for testing images.
-*   `submissions/`: Shared intake area for user-provided screenshots before full labeling.
-    *   `<batch_name>/raw/`: Original screenshots copied into the repo for agent access.
+*   `submissions/`: Historical intake metadata for user-provided screenshots before full labeling.
+    *   `<batch_name>/raw/`: Existing historical inputs and pointers; new production raw files belong in external storage.
     *   `<batch_name>/manifest.csv`: Shared metadata for each screenshot.
     *   `<batch_name>/README.md`: Short summary of the batch.
 
@@ -51,37 +58,26 @@ To contribute new training data (images and labels), please follow these steps t
     *   For selected cards, label them as their base class (e.g., 'A_spades') and the detection logic in `card_recognizer.py` will handle the 'selected' state based on Y-coordinate analysis.
     *   The output format for labels **must be YOLO (`.txt`)**.
 
-3.  **Organize and Prepare Files for Upload:**
-    *   After labeling, move the new image files into the appropriate `images/train/`, `images/val/`, or `images/test/` subdirectories within your local `tienlen-bot/data` folder.
-    *   Place their corresponding label files (`.txt`) into the respective `labels/train/`, `labels/val/`, or `labels/test/` subdirectories.
-    *   Maintain a clear separation between training, validation, and testing sets to avoid data leakage.
+3.  **Organize the external training workspace:**
+    *   After labeling, place images and labels in the approved external
+        training workspace, not in this repository's `data/` directory.
+    *   Keep separate `train`, `val`, and `test` directories and enforce the
+        group-first split rules in `docs/TRAINING_PLAN_FINAL.md`.
+    *   Keep the original raw files immutable and record their paths and
+        checksums in the inventory.
 
-4.  **Update `dataset.yaml` (if necessary):**
-    *   The `configs/dataset.yaml` file defines the dataset path and class names. If you introduce new classes (unlikely for a standard 52-card deck but possible for special game elements), ensure this file is updated accordingly.
+4.  **Create the local dataset configuration:**
+    *   Create `dataset.yaml` on the VPS with a resolved absolute path to the
+        external workspace and the fixed 52-card class names.
+    *   Do not commit a machine-specific dataset YAML to this repository.
 
-5.  **Commit and Push (using Git LFS for large files):**
-    *   For image and label files, especially if they are large in number or size, **we will use Git Large File Storage (LFS)**. This prevents bloating the Git repository history with binary files.
-    *   **First-time setup for Git LFS:**
-        ```bash
-        git lfs install
-        git lfs track "data/images/*.png"
-        git lfs track "data/images/*.jpg"
-        git lfs track "data/labels/*.txt"
-        git add .gitattributes
-        ```
-    *   Add your new image and label files to Git:
-        ```bash
-        git add data/images/train/your_image.png data/labels/train/your_image.txt
-        # ... add all new files
-        ```
-    *   Commit your changes with a descriptive message:
-        ```bash
-        git commit -m "feat(data): Add new training images and labels for [specific scenario]"
-        ```
-    *   Push your changes to your forked repository:
-        ```bash
-        git push origin your-feature-branch
-        ```
+5.  **Publish metadata only:**
+    *   Do not add new raw images, labels, runs, or weights to Git, including
+        through Git LFS. Store them on the approved VPS/NAS/S3 workspace.
+    *   Commit only the reviewed inventory, split manifest, annotation review,
+        metrics, model-card metadata, and SHA-256/checksum files.
+    *   Never place a machine-specific absolute path in a committed
+        `dataset.yaml`.
 
 6.  **Create a Pull Request (PR):**
     *   Open a Pull Request from your branch to the `main` branch of the original `tienlen-bot` repository.
@@ -89,4 +85,7 @@ To contribute new training data (images and labels), please follow these steps t
 
 ## Data Versioning and Reproducibility
 
-To ensure data versioning and reproducibility, especially as the dataset grows, we will integrate [DVC (Data Version Control)](https://dvc.org/) in a future phase. DVC allows us to track large files and directories in Git without committing their contents directly, making it easier to manage dataset updates and switch between different versions of the data. For now, Git LFS will handle the storage of large image files efficiently.
+For reproducibility, every external dataset release must have a stable
+dataset version and SHA-256 manifest. DVC or another external artifact store
+may be introduced later, but no new binary dataset or model is committed to
+this repository by default.

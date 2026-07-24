@@ -8,7 +8,9 @@
   "required_branch": "agent/gemini-perception-ui-01b",
   "checkout_directory": "tienlen-bot-gemini",
   "output_directory": "GEMINI_PERCEPTION_UI_01B_OUTPUT",
-  "status": "ACTIVE",
+  "status": "PAUSED_FOR_OWNER_REVIEW",
+  "pause_reason": "GEMINI-PERCEPTION-UI-01B delivery is complete; no new coding task is authorized until the owner approves a new active policy.",
+  "paused_at": "2026-07-25",
   "policy": "deny_by_default",
   "allowed_new_paths": [
     "bot/perception/ui_inference_runner.py",
