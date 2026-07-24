@@ -1,9 +1,10 @@
 # Perception UI Inference Runner 0.4.0 verification commands
 
-# 1. Run all unit and regression tests (expected: 267 pass)
+# R3 verification commands; execute from repository root.
+# 1. Run all unit and regression tests (expected: 299 pass)
 py -3 -m unittest discover -s tests -v
 
-# 2. Run runner specific tests (expected: 40 pass)
+# 2. Run runner specific tests (expected: 72 pass)
 py -3 -m unittest discover -s tests -p "test_perception_ui_inference_runner.py" -v
 
 # 3. Check imports and static compilation

@@ -13,7 +13,7 @@ When a component fails, the runner:
 
 ## Failure Reason Codes
 
-- `IMAGE_LOAD_ERROR`: Raised when an image file cannot be read or decoded from disk.
+- `IMAGE_INTEGRITY_ERROR`: Raised when an image path, size, checksum, or dimensions fail validation.
 - `BUTTON_DETECTOR_ERROR`: Raised when `TemplateButtonDetector.detect()` throws an exception.
 - `OCR_DETECTOR_ERROR`: Raised when `TesseractOcr.recognize()` throws an exception.
 - `TURN_DETECTOR_ERROR`: Raised when `HybridTurnOwnerDetector.detect()` throws an exception.
