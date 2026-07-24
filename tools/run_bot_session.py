@@ -2,8 +2,10 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
+import signal
 import sys
 import time
+from threading import Event
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -105,6 +107,16 @@ def main(argv: list[str] | None = None) -> int:
             "WARN",
         )
 
+    stop_event = Event()
+
+    def request_stop(signum, _frame) -> None:
+        log(f"Shutdown requested by signal {signum}; finishing current check.", "INFO")
+        stop_event.set()
+
+    signal.signal(signal.SIGINT, request_stop)
+    if hasattr(signal, "SIGTERM"):
+        signal.signal(signal.SIGTERM, request_stop)
+
     heartbeat = 0
     last_window_title = emulator_name
     adb_ok_previous: bool | None = None
@@ -117,7 +129,7 @@ def main(argv: list[str] | None = None) -> int:
         f"log_summary_every={SUMMARY_EVERY_HEARTBEATS} checks"
     )
 
-    while True:
+    while not stop_event.is_set():
         heartbeat += 1
         adb_ok = False
         adb_response = "-"
@@ -192,7 +204,10 @@ def main(argv: list[str] | None = None) -> int:
         adb_ok_previous = adb_ok
         window_ok_previous = window_ok
 
-        time.sleep(CHECK_INTERVAL_SECONDS)
+        stop_event.wait(CHECK_INTERVAL_SECONDS)
+
+    log("Bot session stopped gracefully.", "INFO")
+    return 0
 
 
 if __name__ == "__main__":
