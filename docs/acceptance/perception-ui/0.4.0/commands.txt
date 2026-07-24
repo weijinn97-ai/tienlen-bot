@@ -1,0 +1,19 @@
+# Perception UI Inference Runner 0.4.0 verification commands
+
+# 1. Run all unit and regression tests (expected: 267 pass)
+py -3 -m unittest discover -s tests -v
+
+# 2. Run runner specific tests (expected: 40 pass)
+py -3 -m unittest discover -s tests -p "test_perception_ui_inference_runner.py" -v
+
+# 3. Check imports and static compilation
+py -3 -m compileall -q bot contracts tools
+
+# 4. Enforce module governance rules
+py -3 tools/check_module_governance.py
+
+# 5. Check scope guidelines
+powershell -ExecutionPolicy Bypass -File gemini_handoff_bundle/guard_scope.ps1
+
+# 6. Verify cross-platform LF checksum status of evidence files:
+py -3 -c "import hashlib, os, sys; base='docs/acceptance/perception-ui/0.4.0'; err=[]; lines=[l.strip().split(' *') for l in open(os.path.join(base, 'artifacts.sha256'), 'r', encoding='utf-8') if l.strip()]; [ (print(f'{n}: match=True') if hashlib.sha256(open(os.path.join(base, n), 'rb').read().replace(b'\r\n', b'\n')).hexdigest() == h else (print(f'{n}: match=False', file=sys.stderr) or err.append(1))) for h, n in sorted(lines, key=lambda x: x[1]) ]; sys.exit(1 if err else 0)"

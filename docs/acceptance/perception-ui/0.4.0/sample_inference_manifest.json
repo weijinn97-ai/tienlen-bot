@@ -1,0 +1,13 @@
+{
+  "dataset_id": "ui-source-v1",
+  "config_sha256": "4b684cb321ca8d103328e3b7b25ad872e42941aa89c3b88b7754f9a0c80b91df",
+  "source_commit": "00e82bbc59befeb7db9450bb945c2eaae93d4bb3",
+  "input_sha256": {
+    "source.json": "a57e3bc8f278d6b1d1980a32454b5df019aa6732ef8a109e25d2ea99f4d85ccb",
+    "frame_index.jsonl": "8b52f36d88c279c1e102f823e25bde01889c25de1e56bdf1a0c801d9f8b44bb2"
+  },
+  "output_sha256": {
+    "predictions.jsonl": "df2a3bc8ef87b2e1098de25bdfa929aa6732ef8a109e25d2ea99f4d85c88bb21",
+    "failures.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  }
+}
