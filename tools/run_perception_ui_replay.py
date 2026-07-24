@@ -99,27 +99,20 @@ def main(
         return 3
 
     try:
-        source = load_ui_inference_source(args.source)
-    except Exception as e:
-        print("STATUS=INVALID", flush=True)
-        print(f"Error: Failed to load source: {e}", file=sys.stderr)
-        return 3  # INVALID
-
-    try:
         config = load_ui_inference_config(args.config)
     except Exception as e:
         print("STATUS=INVALID", flush=True)
         print(f"Error: Failed to load config: {e}", file=sys.stderr)
         return 3  # INVALID
 
-    # Enforce resource limits check on source frame index length
-    max_records = config.resource_limits.get("max_records", 1000000)
-    if len(source.frame_index) > max_records:
-        print("STATUS=INVALID", flush=True)
-        print(
-            f"Error: Source frame index length {len(source.frame_index)} exceeds max_records limit {max_records}",
-            file=sys.stderr,
+    try:
+        source = load_ui_inference_source(
+            args.source,
+            resource_limits=config.resource_limits,
         )
+    except Exception as e:
+        print("STATUS=INVALID", flush=True)
+        print(f"Error: Failed to load source: {e}", file=sys.stderr)
         return 3  # INVALID
 
     # Validate source/config viewport match
@@ -127,6 +120,11 @@ def main(
         print("STATUS=INVALID", flush=True)
         print("Error: Source viewport does not match config viewport", file=sys.stderr)
         return 3  # INVALID
+
+    if not source.frame_index:
+        print("STATUS=NO_DATA", flush=True)
+        print("Inference NO_DATA")
+        return 2
 
     # Set up adapters (injectable for tests, real for production)
     try:

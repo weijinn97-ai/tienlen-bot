@@ -20,6 +20,7 @@ import sys
 import os
 import math
 import subprocess
+from unittest import mock
 from pathlib import Path
 from types import MappingProxyType
 import numpy as np
@@ -42,7 +43,14 @@ from bot.perception import (
     ButtonTemplateConfig,
 )
 from bot.perception.ui_evaluation import evaluate_ui_predictions, UiEvaluationConfig
-from contracts.interfaces import Rect, ButtonId, ButtonState, SeatPosition
+from contracts.interfaces import (
+    Rect,
+    ButtonId,
+    ButtonState,
+    SeatPosition,
+    TurnOwnerEvidence,
+    TurnPrimarySignal,
+)
 from bot.perception.turn_owner import (
     TurnOwnerDetection,
     TurnOwnerConsensusResult,
@@ -66,13 +74,15 @@ class FakeButtonDetector:
 
 class FakeOcrDetector:
     def __init__(self, result=None):
-        self.result = result or OcrText("UNKNOWN", Rect(0,0,10,10), 0.0)
+        self.result = result
         self.calls = 0
     def recognize(self, frame, roi, whitelist=""):
         self.calls += 1
         if isinstance(self.result, Exception):
             raise self.result
-        return self.result
+        if self.result is None:
+            return OcrText("UNKNOWN", roi, 0.0)
+        return OcrText(self.result.text, roi, self.result.confidence)
 
 class FakeTurnDetector:
     def __init__(self, result=None):
@@ -188,6 +198,9 @@ class UiInferenceRunnerTests(unittest.TestCase):
                 "max_file_size_bytes": 209715200,
                 "max_records": 500000,
                 "max_line_length": 1048576,
+                "max_total_input_bytes": 536870912,
+                "max_image_pixels": 16777216,
+                "max_output_bytes": 104857600,
             },
             "source_commit": "00e82bbc59befeb7db9450bb945c2eaae93d4bb3",
         }
@@ -697,15 +710,23 @@ class UiInferenceRunnerTests(unittest.TestCase):
     def test_23_viewport_mismatch_before_adapter_calls(self):
         """Source/config viewport mismatch is rejected before any adapter call."""
         cfg_p, src_dir = self._setup_valid_bundle()
-        # Modify source viewport to mismatch config
-        src_json = json.loads((Path(src_dir) / "source.json").read_text(encoding="utf-8"))
-        src_json["viewport"] = {"width": 1920, "height": 1080}
-        (Path(src_dir) / "source.json").write_text(json.dumps(src_json), encoding="utf-8")
-
-        # We need to recreate the source without dimension check (only source.json viewport differs)
-        # The source loader will fail because frame dimensions won't match new viewport
+        source = load_ui_inference_source(src_dir)
+        config = load_ui_inference_config(cfg_p)
+        mismatched_source = UiInferenceSource(
+            dataset_id=source.dataset_id,
+            viewport={"width": 1920, "height": 1080},
+            frame_index=source.frame_index,
+            input_sha256=source.input_sha256,
+            source_dir=source.source_dir,
+        )
+        button_detector = FakeButtonDetector()
         with self.assertRaises(ValueError):
-            load_ui_inference_source(src_dir)
+            run_ui_inference(
+                mismatched_source,
+                _make_adapters(btn_det=button_detector),
+                config,
+            )
+        self.assertEqual(button_detector.calls, 0)
 
     def test_24_toctou_frame_mutation_after_load(self):
         """Frame file changed after source loading causes IMAGE_INTEGRITY_ERROR at inference."""
@@ -1253,44 +1274,35 @@ class UiInferenceRunnerTests(unittest.TestCase):
         out_dir = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, out_dir)
 
-        # Write a helper script that injects fake adapters
-        injector = Path(self.tmp_dir) / "injector.py"
-        injector.write_text(
-            """
-import sys
-sys.path.insert(0, sys.argv[1])
-from tests.test_perception_ui_inference_runner import FakeButtonDetector, FakeOcrDetector, FakeTurnDetector, FakeTurnConsensus
-
-class Adapters:
-    button_detector = FakeButtonDetector()
-    ocr_detector = FakeOcrDetector()
-    turn_detector = FakeTurnDetector()
-    turn_consensus = FakeTurnConsensus()
-
-def factory(config):
-    return Adapters()
-""",
-            encoding="utf-8",
-        )
-
-        # Use subprocess calling the CLI with a custom mini script that patches adapter_factory
-        # Build a wrapper script instead
         wrapper_script = Path(self.tmp_dir) / "run_complete.py"
         repo_root = str(Path(__file__).parent.parent)
         wrapper_script.write_text(
             f"""
 import sys
 sys.path.insert(0, {repr(repo_root)})
-from tools.run_perception_ui_replay import main, UiAdapters
-from tests.test_perception_ui_inference_runner import (
-    FakeButtonDetector, FakeOcrDetector, FakeTurnDetector, FakeTurnConsensus
-)
+from tools.run_perception_ui_replay import main
+from bot.perception.ocr import OcrText
+from bot.perception.turn_owner import TurnOwnerConsensusResult
 
+class ButtonDetector:
+    def detect(self, frame):
+        return ()
+class OcrDetector:
+    def recognize(self, frame, roi, whitelist=""):
+        return OcrText("UNKNOWN", roi, 0.0)
+class TurnDetector:
+    def detect(self, frame, previous_card_counts, current_card_counts):
+        raise AssertionError("turn detector must not run on first frame")
+class Consensus:
+    def reset(self, bot_id):
+        pass
+    def observe(self, bot_id, detection):
+        return TurnOwnerConsensusResult(None, 1, 0, 3)
 class FakeAdapters:
-    button_detector = FakeButtonDetector()
-    ocr_detector = FakeOcrDetector()
-    turn_detector = FakeTurnDetector()
-    turn_consensus = FakeTurnConsensus()
+    button_detector = ButtonDetector()
+    ocr_detector = OcrDetector()
+    turn_detector = TurnDetector()
+    turn_consensus = Consensus()
 
 def factory(config):
     return FakeAdapters()
@@ -1312,8 +1324,15 @@ sys.exit(main(adapter_factory=factory))
         self.assertEqual(res.returncode, 0, f"Expected exit 0 (COMPLETE). stdout={res.stdout} stderr={res.stderr}")
         self.assertIn("STATUS=COMPLETE", res.stdout)
         self.assertNotIn("Traceback", res.stderr)
-        # Verify no input mutation
-        self.assertTrue((Path(src_dir) / "source.json").exists())
+        self.assertEqual(
+            {path.name for path in out_dir.iterdir()},
+            {
+                "predictions.jsonl",
+                "failures.jsonl",
+                "inference_manifest.json",
+                "run_metadata.json",
+            },
+        )
 
     def test_53_cli_exit_2_no_data(self):
         """CLI returns exit code 2 (NO_DATA) when source has zero frames."""
@@ -1328,22 +1347,56 @@ sys.exit(main(adapter_factory=factory))
         src["frame_index_sha256"] = hashlib.sha256(empty_fi.encode("utf-8")).hexdigest()
         (Path(src_dir) / "source.json").write_text(json.dumps(src), encoding="utf-8")
 
+        res = subprocess.run(
+            [
+                sys.executable,
+                self._cli_path(),
+                "--source",
+                src_dir,
+                "--config",
+                str(cfg_p),
+                "--output",
+                str(out_dir),
+            ],
+            env=self._cli_env(),
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(res.returncode, 2)
+        self.assertIn("STATUS=NO_DATA", res.stdout)
+        self.assertNotIn("Traceback", res.stderr)
+        self.assertEqual(list(out_dir.iterdir()), [])
+
+    def test_54_cli_exit_1_degraded(self):
+        """CLI returns exit code 1 and safe artifacts after a detector failure."""
+        cfg_p, src_dir = self._setup_valid_bundle()
+        out_dir = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, out_dir)
+        wrapper_script = Path(self.tmp_dir) / "run_degraded.py"
         repo_root = str(Path(__file__).parent.parent)
-        wrapper_script = Path(self.tmp_dir) / "run_nodata.py"
         wrapper_script.write_text(
             f"""
 import sys
 sys.path.insert(0, {repr(repo_root)})
 from tools.run_perception_ui_replay import main
-from tests.test_perception_ui_inference_runner import (
-    FakeButtonDetector, FakeOcrDetector, FakeTurnDetector, FakeTurnConsensus
-)
 
+class ButtonDetector:
+    def detect(self, frame):
+        raise RuntimeError("deliberate detector failure")
+class Unused:
+    def recognize(self, *args, **kwargs):
+        raise AssertionError("OCR must not run after button failure")
+    def detect(self, *args, **kwargs):
+        raise AssertionError("turn must not run after button failure")
+    def observe(self, *args, **kwargs):
+        raise AssertionError("consensus must not run after button failure")
+    def reset(self, bot_id):
+        pass
 class FakeAdapters:
-    button_detector = FakeButtonDetector()
-    ocr_detector = FakeOcrDetector()
-    turn_detector = FakeTurnDetector()
-    turn_consensus = FakeTurnConsensus()
+    button_detector = ButtonDetector()
+    ocr_detector = Unused()
+    turn_detector = Unused()
+    turn_consensus = Unused()
 
 def factory(config):
     return FakeAdapters()
@@ -1352,17 +1405,28 @@ sys.exit(main(adapter_factory=factory))
 """,
             encoding="utf-8",
         )
-
-        # Source loading will fail on empty JSONL (blank line rejection) so we just check INVALID is OK
-        # Alternatively: test NO_DATA by skipping source loading and directly testing status_to_exit_code
-        from tools.run_perception_ui_replay import status_to_exit_code
-        self.assertEqual(status_to_exit_code(0, 0), 2, "Zero frames → NO_DATA exit code 2")
-
-    def test_54_cli_exit_1_degraded(self):
-        """CLI status_to_exit_code returns 1 (DEGRADED) when there are failures but frames exist."""
-        from tools.run_perception_ui_replay import status_to_exit_code
-        self.assertEqual(status_to_exit_code(3, 10), 1, "Failures present → DEGRADED exit code 1")
-        self.assertEqual(status_to_exit_code(1, 1), 1, "1 failure in 1 frame → DEGRADED exit code 1")
+        res = subprocess.run(
+            [
+                sys.executable,
+                str(wrapper_script),
+                "--source",
+                src_dir,
+                "--config",
+                str(cfg_p),
+                "--output",
+                str(out_dir),
+            ],
+            env=self._cli_env(),
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(res.returncode, 1)
+        self.assertIn("STATUS=DEGRADED", res.stdout)
+        self.assertNotIn("Traceback", res.stderr)
+        self.assertIn(
+            "BUTTON_DETECTOR_ERROR",
+            (out_dir / "failures.jsonl").read_text(encoding="utf-8"),
+        )
 
     def test_55_cli_exit_3_overlap_check(self):
         """CLI returns exit code 3 (INVALID) when output dir is inside source dir."""
@@ -1446,11 +1510,229 @@ sys.exit(main(adapter_factory=factory))
         self.assertEqual(len(res.predictions), len(source.frame_index))
 
     def test_61_lazy_import_no_side_effects(self):
-        """Importing the module does not start Tesseract, ADB, MEmu or GPU processes."""
-        # Verified by the fact that all tests run without any external process dependency.
-        import bot.perception.ui_inference_runner as m
-        self.assertTrue(hasattr(m, "run_ui_inference"))
-        self.assertTrue(hasattr(m, "load_ui_inference_source"))
+        """A clean subprocess imports the runner without importing pytesseract or ADB modules."""
+        repo_root = str(Path(__file__).parent.parent)
+        script = (
+            "import sys;"
+            f"sys.path.insert(0,{repo_root!r});"
+            "import bot.perception.ui_inference_runner;"
+            "blocked={'pytesseract','adb','ppadb'};"
+            "assert not blocked.intersection(sys.modules)"
+        )
+        result = subprocess.run(
+            [sys.executable, "-c", script],
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+
+    def test_62_explicit_invisible_button_never_becomes_visible(self):
+        """A high-confidence detector state with is_visible=False remains invisible and disabled."""
+        cfg_p, src_dir = self._setup_valid_bundle()
+        source = load_ui_inference_source(src_dir)
+        config = load_ui_inference_config(cfg_p)
+        hidden = ButtonState(
+            ButtonId.PLAY,
+            "play",
+            Rect(0, 0, 10, 10),
+            False,
+            True,
+            0.95,
+        )
+        result = run_ui_inference(
+            source,
+            _make_adapters(btn_det=FakeButtonDetector([hidden])),
+            config,
+            clock=lambda: 1.0,
+        )
+        self.assertFalse(result.predictions[0].buttons["play"].visible)
+        self.assertFalse(result.predictions[0].buttons["play"].enabled)
+
+    def test_63_first_frame_false_self_consensus_is_rejected(self):
+        """The first frame cannot emit SELF without card-count delta or 3/4 consensus."""
+        cfg_p, src_dir = self._setup_valid_bundle()
+        source = load_ui_inference_source(src_dir)
+        config = load_ui_inference_config(cfg_p)
+        false_consensus = FakeTurnConsensus(
+            TurnOwnerConsensusResult(SeatPosition.SELF, 1, 0, 3)
+        )
+        result = run_ui_inference(
+            source,
+            _make_adapters(turn_con=false_consensus),
+            config,
+            clock=lambda: 1.0,
+        )
+        self.assertEqual(result.failures[0].reason_code, "CONSENSUS_ERROR")
+        self.assertIsNone(result.predictions[0].turn_owner)
+
+    def test_64_ocr_result_for_wrong_roi_is_rejected(self):
+        """OCR output must refer to the exact ROI requested by the runner."""
+        cfg_p, src_dir = self._setup_valid_bundle()
+        source = load_ui_inference_source(src_dir)
+        config = load_ui_inference_config(cfg_p)
+
+        class WrongRoiOcr:
+            def recognize(self, frame, roi, whitelist=""):
+                return OcrText("13", Rect(0, 0, 1, 1), 0.9)
+
+        result = run_ui_inference(
+            source,
+            _make_adapters(ocr_det=WrongRoiOcr()),
+            config,
+            clock=lambda: 1.0,
+        )
+        self.assertEqual(result.failures[0].reason_code, "OCR_DETECTOR_ERROR")
+        self.assertEqual(result.predictions[0].ocr_fields[0].text, "UNKNOWN")
+
+    def test_65_configured_total_input_limit_is_enforced(self):
+        """A configured total-input limit rejects the source before inference."""
+        cfg_p, src_dir = self._setup_valid_bundle()
+        data = json.loads(Path(cfg_p).read_text(encoding="utf-8"))
+        data["resource_limits"]["max_total_input_bytes"] = 100
+        limited_path = self._write_file("config_total_limit.json", json.dumps(data))
+        config = load_ui_inference_config(limited_path)
+        with self.assertRaisesRegex(ValueError, "Total input bytes"):
+            load_ui_inference_source(src_dir, resource_limits=config.resource_limits)
+
+    def test_66_configured_image_pixel_limit_is_enforced(self):
+        """A configured image-pixel limit is applied before inference."""
+        cfg_p, src_dir = self._setup_valid_bundle()
+        data = json.loads(Path(cfg_p).read_text(encoding="utf-8"))
+        data["resource_limits"]["max_image_pixels"] = 100
+        limited_path = self._write_file("config_pixel_limit.json", json.dumps(data))
+        config = load_ui_inference_config(limited_path)
+        with self.assertRaisesRegex(ValueError, "pixel limit"):
+            load_ui_inference_source(src_dir, resource_limits=config.resource_limits)
+
+    def test_67_positive_turn_requires_valid_hybrid_evidence_and_three_of_four(self):
+        """A positive owner is emitted only with agreeing hybrid evidence and latest 3/4 consensus."""
+        cfg_p, src_dir = self._setup_valid_bundle()
+        self._add_second_frame(src_dir)
+        source = load_ui_inference_source(src_dir)
+        config = load_ui_inference_config(cfg_p)
+        roi = Rect(10, 10, 20, 20)
+        evidence = TurnOwnerEvidence(
+            primary_signal=TurnPrimarySignal.AVATAR_HIGHLIGHT,
+            primary_roi=roi,
+            primary_confidence=0.9,
+            secondary_confidence=0.8,
+            signals_agree=True,
+        )
+        detection = TurnOwnerDetection(
+            turn_owner=SeatPosition.SELF,
+            evidence=evidence,
+            primary=HighlightDetection(SeatPosition.SELF, 0.9, roi, {SeatPosition.SELF: 0.9}),
+            secondary=CardCountDelta(SeatPosition.RIGHT, SeatPosition.SELF, 0.8, 1),
+        )
+        class SequenceConsensus:
+            def __init__(self):
+                self.calls = 0
+            def reset(self, bot_id):
+                pass
+            def observe(self, bot_id, observed_detection):
+                self.calls += 1
+                if self.calls == 1:
+                    return TurnOwnerConsensusResult(None, 1, 0, 3)
+                return TurnOwnerConsensusResult(SeatPosition.SELF, 4, 3, 3)
+
+        result = run_ui_inference(
+            source,
+            _make_adapters(
+                turn_det=FakeTurnDetector(detection),
+                turn_con=SequenceConsensus(),
+            ),
+            config,
+            clock=lambda: 1.0,
+        )
+        self.assertIsNone(result.predictions[0].turn_owner)
+        self.assertEqual(result.predictions[1].turn_owner, "SELF")
+        self.assertTrue(result.predictions[1].turn_latest_frame_matches)
+
+    def test_68_disagreeing_hybrid_evidence_cannot_emit_owner(self):
+        """A detector owner with signals_agree=False produces a frame-wide safe result."""
+        cfg_p, src_dir = self._setup_valid_bundle()
+        self._add_second_frame(src_dir)
+        source = load_ui_inference_source(src_dir)
+        config = load_ui_inference_config(cfg_p)
+        roi = Rect(10, 10, 20, 20)
+        evidence = TurnOwnerEvidence(
+            primary_signal=TurnPrimarySignal.AVATAR_HIGHLIGHT,
+            primary_roi=roi,
+            primary_confidence=0.9,
+            secondary_confidence=0.8,
+            signals_agree=False,
+        )
+        detection = TurnOwnerDetection(
+            turn_owner=SeatPosition.SELF,
+            evidence=evidence,
+            primary=HighlightDetection(SeatPosition.SELF, 0.9, roi, {SeatPosition.SELF: 0.9}),
+            secondary=CardCountDelta(SeatPosition.RIGHT, SeatPosition.SELF, 0.8, 1),
+        )
+        result = run_ui_inference(
+            source,
+            _make_adapters(turn_det=FakeTurnDetector(detection)),
+            config,
+            clock=lambda: 1.0,
+        )
+        self.assertEqual(result.failures[0].reason_code, "TURN_DETECTOR_ERROR")
+        self.assertIsNone(result.predictions[1].turn_owner)
+
+    def test_69_configured_line_limit_is_enforced_while_streaming(self):
+        """The configured JSONL line-byte limit is used by source ingestion."""
+        cfg_p, src_dir = self._setup_valid_bundle()
+        data = json.loads(Path(cfg_p).read_text(encoding="utf-8"))
+        data["resource_limits"]["max_line_length"] = 16
+        limited_path = self._write_file("config_line_limit.json", json.dumps(data))
+        config = load_ui_inference_config(limited_path)
+        with self.assertRaisesRegex(ValueError, "max length"):
+            load_ui_inference_source(src_dir, resource_limits=config.resource_limits)
+
+    def test_70_configured_file_limit_is_checked_before_image_read(self):
+        """The configured per-file limit rejects an oversized image at source loading."""
+        cfg_p, src_dir = self._setup_valid_bundle()
+        image_path = Path(src_dir) / "frames" / "f1.png"
+        data = json.loads(Path(cfg_p).read_text(encoding="utf-8"))
+        config_size = Path(cfg_p).stat().st_size
+        self.assertGreater(image_path.stat().st_size, config_size)
+        data["resource_limits"]["max_file_size_bytes"] = image_path.stat().st_size - 1
+        limited_path = self._write_file("config_file_limit.json", json.dumps(data))
+        config = load_ui_inference_config(limited_path)
+        with self.assertRaisesRegex(ValueError, "exceeds limit"):
+            load_ui_inference_source(src_dir, resource_limits=config.resource_limits)
+
+    def test_71_configured_output_limit_is_enforced_by_writer(self):
+        """The writer uses the configured output limit carried by the inference result."""
+        cfg_p, src_dir = self._setup_valid_bundle()
+        data = json.loads(Path(cfg_p).read_text(encoding="utf-8"))
+        data["resource_limits"]["max_output_bytes"] = 1
+        limited_path = self._write_file("config_output_limit.json", json.dumps(data))
+        config = load_ui_inference_config(limited_path)
+        source = load_ui_inference_source(src_dir, resource_limits=config.resource_limits)
+        result = run_ui_inference(source, _make_adapters(), config, clock=lambda: 1.0)
+        out_dir = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, out_dir)
+        with self.assertRaisesRegex(ValueError, "Total output bytes"):
+            write_ui_inference_result(result, out_dir)
+
+    def test_72_cli_validates_config_before_loading_source(self):
+        """CLI does not call the source loader when configuration validation fails."""
+        from tools import run_perception_ui_replay as cli
+
+        source_loader = mock.Mock(side_effect=AssertionError("source loader called"))
+        with mock.patch.object(cli, "load_ui_inference_source", source_loader):
+            exit_code = cli.main(
+                [
+                    "--source",
+                    "missing-source",
+                    "--config",
+                    "missing-config",
+                    "--output",
+                    str(Path(self.tmp_dir) / "out"),
+                ]
+            )
+        self.assertEqual(exit_code, 3)
+        source_loader.assert_not_called()
 
 
 if __name__ == "__main__":

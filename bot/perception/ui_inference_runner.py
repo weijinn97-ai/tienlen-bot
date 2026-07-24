@@ -14,7 +14,15 @@ from types import MappingProxyType
 import cv2
 import numpy as np
 
-from contracts.interfaces import Rect, ButtonId, ButtonState, SeatPosition
+from contracts.interfaces import (
+    Rect,
+    ButtonId,
+    ButtonState,
+    SeatPosition,
+    TurnOwnerEvidence,
+    TurnPrimarySignal,
+    TurnSecondarySignal,
+)
 from bot.perception.turn_owner import (
     TurnOwnerDetection,
     TurnOwnerConsensusResult,
@@ -175,6 +183,7 @@ class UiInferenceResult:
     config_sha256: str
     dataset_id: str
     input_sha256: Mapping[str, str]
+    max_output_bytes: int = _HARD_MAX_OUTPUT_BYTES
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "predictions", tuple(self.predictions))
@@ -369,6 +378,30 @@ def _safe_failure_details(msg: str) -> str:
 # Strict Adapter Output Validators (Fix B)                            #
 # ------------------------------------------------------------------ #
 
+def _validate_probability(value: Any, name: str) -> float:
+    if type(value) is bool or not isinstance(value, (int, float)):
+        raise ValueError(f"{name} must be numeric")
+    result = float(value)
+    if not math.isfinite(result) or not 0.0 <= result <= 1.0:
+        raise ValueError(f"{name} must be finite in [0.0, 1.0]")
+    return result
+
+
+def _validate_frame_rect(value: Any, name: str, width: int, height: int) -> Rect:
+    if type(value) is not Rect:
+        raise ValueError(f"{name} must be exact Rect")
+    if value.width <= 0 or value.height <= 0:
+        raise ValueError(f"{name} must have positive dimensions")
+    if (
+        value.x < 0
+        or value.y < 0
+        or value.x + value.width > width
+        or value.y + value.height > height
+    ):
+        raise ValueError(f"{name} must be contained in the frame")
+    return value
+
+
 def _validate_button_states(states: Any, vp_width: int, vp_height: int) -> Tuple[ButtonState, ...]:
     """Validate the raw output of ButtonDetectorAdapter.detect()."""
     if not isinstance(states, (list, tuple)):
@@ -383,34 +416,24 @@ def _validate_button_states(states: Any, vp_width: int, vp_height: int) -> Tuple
             )
         if not isinstance(s.button_id, ButtonId):
             raise ValueError(f"Button state[{i}].button_id must be ButtonId")
+        if type(s.label) is not str:
+            raise ValueError(f"Button state[{i}].label must be exact str")
         if type(s.is_visible) is not bool:
             raise ValueError(f"Button state[{i}].is_visible must be bool")
         if type(s.is_enabled) is not bool:
             raise ValueError(f"Button state[{i}].is_enabled must be bool")
-        # confidence: finite float in [0.0, 1.0], bool rejected
-        if type(s.confidence) is bool or not isinstance(s.confidence, (int, float)):
-            raise ValueError(f"Button state[{i}].confidence must be numeric")
-        conf_f = float(s.confidence)
-        if not math.isfinite(conf_f) or not (0.0 <= conf_f <= 1.0):
-            raise ValueError(
-                f"Button state[{i}].confidence must be finite in [0.0, 1.0], got {conf_f}"
-            )
-        # ROI validation if present
-        if s.roi is not None:
-            if not isinstance(s.roi, Rect):
-                raise ValueError(f"Button state[{i}].roi must be Rect or None")
-            if s.roi.width <= 0 or s.roi.height <= 0:
-                raise ValueError(f"Button state[{i}].roi must have positive dimensions")
-            if (s.roi.x < 0 or s.roi.y < 0
-                    or s.roi.x + s.roi.width > vp_width
-                    or s.roi.y + s.roi.height > vp_height):
-                raise ValueError(
-                    f"Button state[{i}].roi is outside the frame"
-                )
+        _validate_probability(s.confidence, f"Button state[{i}].confidence")
+        _validate_frame_rect(s.roi, f"Button state[{i}].roi", vp_width, vp_height)
         validated.append(s)
     return tuple(validated)
 
-def _validate_ocr_text(result: Any) -> OcrText:
+
+def _validate_ocr_text(
+    result: Any,
+    expected_roi: Rect,
+    vp_width: int,
+    vp_height: int,
+) -> OcrText:
     """Validate the raw output of OcrAdapter.recognize()."""
     if not isinstance(result, OcrText):
         raise ValueError(
@@ -418,16 +441,18 @@ def _validate_ocr_text(result: Any) -> OcrText:
         )
     if type(result.text) is not str:
         raise ValueError("OcrText.text must be exact str")
-    if type(result.confidence) is bool or not isinstance(result.confidence, (int, float)):
-        raise ValueError("OcrText.confidence must be numeric")
-    conf_f = float(result.confidence)
-    if not math.isfinite(conf_f) or not (0.0 <= conf_f <= 1.0):
-        raise ValueError(
-            f"OcrText.confidence must be finite in [0.0, 1.0], got {conf_f}"
-        )
+    _validate_probability(result.confidence, "OcrText.confidence")
+    roi = _validate_frame_rect(result.roi, "OcrText.roi", vp_width, vp_height)
+    if roi != expected_roi:
+        raise ValueError("OcrText.roi must equal the requested OCR ROI")
     return result
 
-def _validate_turn_detection(result: Any) -> TurnOwnerDetection:
+
+def _validate_turn_detection(
+    result: Any,
+    vp_width: int,
+    vp_height: int,
+) -> TurnOwnerDetection:
     """Validate the raw output of HybridTurnDetectorAdapter.detect()."""
     if not isinstance(result, TurnOwnerDetection):
         raise ValueError(
@@ -435,9 +460,78 @@ def _validate_turn_detection(result: Any) -> TurnOwnerDetection:
         )
     if result.turn_owner is not None and not isinstance(result.turn_owner, SeatPosition):
         raise ValueError("TurnOwnerDetection.turn_owner must be SeatPosition or None")
+    if type(result.primary) is not HighlightDetection:
+        raise ValueError("TurnOwnerDetection.primary must be exact HighlightDetection")
+    if result.primary.owner is not None and not isinstance(result.primary.owner, SeatPosition):
+        raise ValueError("HighlightDetection.owner must be SeatPosition or None")
+    _validate_probability(result.primary.confidence, "HighlightDetection.confidence")
+    if result.primary.owner is None:
+        if result.primary.roi is not None:
+            raise ValueError("HighlightDetection.roi must be None without an owner")
+    else:
+        _validate_frame_rect(
+            result.primary.roi,
+            "HighlightDetection.roi",
+            vp_width,
+            vp_height,
+        )
+    if not isinstance(result.primary.scores, Mapping):
+        raise ValueError("HighlightDetection.scores must be a mapping")
+    for seat, score in result.primary.scores.items():
+        if not isinstance(seat, SeatPosition):
+            raise ValueError("HighlightDetection score keys must be SeatPosition")
+        _validate_probability(score, f"HighlightDetection.scores[{seat.name}]")
+
+    if type(result.secondary) is not CardCountDelta:
+        raise ValueError("TurnOwnerDetection.secondary must be exact CardCountDelta")
+    if result.secondary.actor is not None and not isinstance(result.secondary.actor, SeatPosition):
+        raise ValueError("CardCountDelta.actor must be SeatPosition or None")
+    if (
+        result.secondary.expected_next_owner is not None
+        and not isinstance(result.secondary.expected_next_owner, SeatPosition)
+    ):
+        raise ValueError("CardCountDelta.expected_next_owner must be SeatPosition or None")
+    _validate_probability(result.secondary.confidence, "CardCountDelta.confidence")
+    if type(result.secondary.changed_by) is not int or not 0 <= result.secondary.changed_by <= 13:
+        raise ValueError("CardCountDelta.changed_by must be exact int in [0, 13]")
+    if (result.secondary.actor is None) != (result.secondary.expected_next_owner is None):
+        raise ValueError("CardCountDelta actor and expected owner must both be set or both be null")
+
+    if result.turn_owner is not None:
+        if type(result.evidence) is not TurnOwnerEvidence:
+            raise ValueError("A positive turn owner requires exact TurnOwnerEvidence")
+        evidence = result.evidence
+        if not isinstance(evidence.primary_signal, TurnPrimarySignal):
+            raise ValueError("Turn evidence primary_signal is invalid")
+        if not isinstance(evidence.secondary_signal, TurnSecondarySignal):
+            raise ValueError("Turn evidence secondary_signal is invalid")
+        _validate_frame_rect(
+            evidence.primary_roi,
+            "TurnOwnerEvidence.primary_roi",
+            vp_width,
+            vp_height,
+        )
+        _validate_probability(
+            evidence.primary_confidence,
+            "TurnOwnerEvidence.primary_confidence",
+        )
+        _validate_probability(
+            evidence.secondary_confidence,
+            "TurnOwnerEvidence.secondary_confidence",
+        )
+        if type(evidence.signals_agree) is not bool or not evidence.signals_agree:
+            raise ValueError("A positive turn owner requires agreeing hybrid signals")
+        if result.primary.owner != result.turn_owner:
+            raise ValueError("Primary highlight owner must equal turn owner")
+        if result.secondary.expected_next_owner != result.turn_owner:
+            raise ValueError("Card-count expected owner must equal turn owner")
     return result
 
-def _validate_consensus_result(result: Any) -> TurnOwnerConsensusResult:
+
+def _validate_consensus_result(
+    result: Any,
+    latest_detection: TurnOwnerDetection,
+) -> TurnOwnerConsensusResult:
     """Validate the raw output of TurnConsensusAdapter.observe()."""
     if not isinstance(result, TurnOwnerConsensusResult):
         raise ValueError(
@@ -445,13 +539,24 @@ def _validate_consensus_result(result: Any) -> TurnOwnerConsensusResult:
         )
     if result.turn_owner is not None and not isinstance(result.turn_owner, SeatPosition):
         raise ValueError("TurnOwnerConsensusResult.turn_owner must be SeatPosition or None")
-    if type(result.observed_frames) is not int or type(result.matching_frames) is not int:
+    if (
+        type(result.observed_frames) is not int
+        or type(result.matching_frames) is not int
+        or type(result.required_matches) is not int
+    ):
         raise ValueError("TurnOwnerConsensusResult counts must be int")
+    if result.required_matches != 3:
+        raise ValueError("TurnOwnerConsensusResult.required_matches must be 3")
     if not (0 <= result.matching_frames <= result.observed_frames <= 4):
         raise ValueError(
             f"TurnOwnerConsensusResult counts violate 0 <= matching <= observed <= 4: "
             f"matching={result.matching_frames} observed={result.observed_frames}"
         )
+    if result.turn_owner is not None:
+        if result.observed_frames != 4 or result.matching_frames < 3:
+            raise ValueError("A positive turn owner requires 3 of 4 consensus")
+        if latest_detection.turn_owner != result.turn_owner:
+            raise ValueError("Latest detection must belong to the consensus group")
     return result
 
 # ------------------------------------------------------------------ #
@@ -498,17 +603,29 @@ def load_ui_inference_source(
         raise ValueError("Missing source.json")
 
     # Fix C: check file size before reading
-    eff_max_file = _HARD_MAX_FILE_SIZE_BYTES
-    eff_max_records = _HARD_MAX_RECORDS
-    eff_max_line = _HARD_MAX_LINE_LENGTH
-    if resource_limits:
-        cfg_file = resource_limits.get("max_file_size_bytes", _HARD_MAX_FILE_SIZE_BYTES)
-        cfg_rec = resource_limits.get("max_records", _HARD_MAX_RECORDS)
-        cfg_line = resource_limits.get("max_line_length", _HARD_MAX_LINE_LENGTH)
-        # Config may only tighten hard ceilings
-        eff_max_file = min(int(cfg_file), _HARD_MAX_FILE_SIZE_BYTES)
-        eff_max_records = min(int(cfg_rec), _HARD_MAX_RECORDS)
-        eff_max_line = min(int(cfg_line), _HARD_MAX_LINE_LENGTH)
+    hard_limits = {
+        "max_file_size_bytes": _HARD_MAX_FILE_SIZE_BYTES,
+        "max_records": _HARD_MAX_RECORDS,
+        "max_line_length": _HARD_MAX_LINE_LENGTH,
+        "max_total_input_bytes": _HARD_MAX_TOTAL_INPUT_BYTES,
+        "max_image_pixels": _HARD_MAX_IMAGE_PIXELS,
+        "max_output_bytes": _HARD_MAX_OUTPUT_BYTES,
+    }
+    effective_limits = dict(hard_limits)
+    if resource_limits is not None:
+        if not isinstance(resource_limits, Mapping):
+            raise ValueError("resource_limits must be a mapping")
+        if set(resource_limits) != set(hard_limits):
+            raise ValueError("resource_limits must contain the exact supported keys")
+        for name, ceiling in hard_limits.items():
+            value = resource_limits[name]
+            if type(value) is not int or value <= 0 or value > ceiling:
+                raise ValueError(f"{name} must be exact positive int within its hard ceiling")
+            effective_limits[name] = value
+
+    eff_max_file = effective_limits["max_file_size_bytes"]
+    eff_max_records = effective_limits["max_records"]
+    eff_max_line = effective_limits["max_line_length"]
 
     _check_file_size(source_json_path, eff_max_file)
 
@@ -613,13 +730,13 @@ def load_ui_inference_source(
         if img is None:
             raise ValueError(f"Corrupt or invalid image {rel_path}")
         h, w = img.shape[:2]
-        if w * h > _HARD_MAX_IMAGE_PIXELS:
+        if w * h > effective_limits["max_image_pixels"]:
             raise ValueError(f"Image {rel_path} exceeds pixel limit: {w * h}")
         if w != vp["width"] or h != vp["height"]:
             raise ValueError(f"Image dimensions mismatch for {rel_path}: {w}x{h} != {vp['width']}x{vp['height']}")
 
         total_input_bytes += len(img_bytes)
-        if total_input_bytes > _HARD_MAX_TOTAL_INPUT_BYTES:
+        if total_input_bytes > effective_limits["max_total_input_bytes"]:
             raise ValueError(f"Total input bytes exceeds limit: {total_input_bytes}")
 
         input_sha256[rel_path] = sha
@@ -722,6 +839,33 @@ def load_ui_inference_config(config_path: str | Path) -> "UiInferenceConfig":
     if _require_type(config_dict["schema_version"], int, "schema_version") != 1:
         raise ValueError("Unsupported schema_version in config")
 
+    limits_raw = _require_type(config_dict["resource_limits"], dict, "resource_limits")
+    limit_ceilings = {
+        "max_file_size_bytes": _HARD_MAX_FILE_SIZE_BYTES,
+        "max_records": _HARD_MAX_RECORDS,
+        "max_line_length": _HARD_MAX_LINE_LENGTH,
+        "max_total_input_bytes": _HARD_MAX_TOTAL_INPUT_BYTES,
+        "max_image_pixels": _HARD_MAX_IMAGE_PIXELS,
+        "max_output_bytes": _HARD_MAX_OUTPUT_BYTES,
+    }
+    _require_keys(limits_raw, set(limit_ceilings), "resource_limits")
+
+    def _parse_limit(val: Any, name: str, hard_ceiling: int) -> int:
+        if type(val) is not int:
+            raise ValueError(f"{name} must be exact int, not bool or float")
+        if val <= 0:
+            raise ValueError(f"{name} must be positive")
+        if val > hard_ceiling:
+            raise ValueError(f"{name} {val} exceeds hard ceiling {hard_ceiling}")
+        return val
+
+    resource_limits = {
+        name: _parse_limit(limits_raw[name], name, ceiling)
+        for name, ceiling in limit_ceilings.items()
+    }
+    if len(config_bytes) > resource_limits["max_file_size_bytes"]:
+        raise ValueError("config file exceeds max_file_size_bytes")
+
     vp_raw = _require_type(config_dict["viewport"], dict, "viewport")
     _require_keys(vp_raw, {"width", "height"}, "viewport")
     vp = {
@@ -815,7 +959,7 @@ def load_ui_inference_config(config_path: str | Path) -> "UiInferenceConfig":
             raise ValueError(f"Button template file not found: {filename}")
 
         # Fix C: check template file size before reading
-        _check_file_size(tmpl_file, _HARD_MAX_FILE_SIZE_BYTES)
+        _check_file_size(tmpl_file, resource_limits["max_file_size_bytes"])
 
         expected_tmpl_sha = _require_type(b_cfg["sha256"], str, f"button_templates.{bid_str}.sha256")
         if not _is_valid_hex(expected_tmpl_sha, 64):
@@ -868,31 +1012,6 @@ def load_ui_inference_config(config_path: str | Path) -> "UiInferenceConfig":
     consensus_required_matches = _require_type(consensus_raw["required_matches"], int, "consensus.required_matches")
     if consensus_history_size != 4 or consensus_required_matches != 3:
         raise ValueError("Consensus history_size must be 4 and required_matches must be 3 exactly")
-
-    # Fix C: Resource limits — validate types and enforce hard ceilings
-    limits_raw = _require_type(config_dict["resource_limits"], dict, "resource_limits")
-    _require_keys(limits_raw, {"max_file_size_bytes", "max_records", "max_line_length"}, "resource_limits")
-
-    def _parse_limit(val: Any, name: str, hard_ceiling: int) -> int:
-        if type(val) is bool or type(val) is not int:
-            raise ValueError(f"{name} must be exact int, not bool or float")
-        if val <= 0:
-            raise ValueError(f"{name} must be positive")
-        if val > hard_ceiling:
-            raise ValueError(f"{name} {val} exceeds hard ceiling {hard_ceiling}")
-        return val
-
-    resource_limits = {
-        "max_file_size_bytes": _parse_limit(
-            limits_raw["max_file_size_bytes"], "max_file_size_bytes", _HARD_MAX_FILE_SIZE_BYTES
-        ),
-        "max_records": _parse_limit(
-            limits_raw["max_records"], "max_records", _HARD_MAX_RECORDS
-        ),
-        "max_line_length": _parse_limit(
-            limits_raw["max_line_length"], "max_line_length", _HARD_MAX_LINE_LENGTH
-        ),
-    }
 
     source_commit = _require_type(config_dict["source_commit"], str, "source_commit")
     if not _is_valid_hex(source_commit, 40):
@@ -998,11 +1117,19 @@ def run_ui_inference(
         last_sequence_id = rec.sequence_id
 
         rel_path = rec.relative_path
-        img_path = Path(source.source_dir) / rel_path
+        source_root = Path(source.source_dir).resolve()
+        img_path = source_root / rel_path
 
         # Fix D: TOCTOU — re-read and revalidate checksum + dimensions at inference time
         try:
-            runtime_bytes = img_path.read_bytes()
+            resolved_runtime_path = _validate_path(rel_path, source_root, {})
+            if resolved_runtime_path != img_path.resolve():
+                raise ValueError("Frame canonical path changed after source loading")
+            _check_file_size(
+                resolved_runtime_path,
+                config.resource_limits["max_file_size_bytes"],
+            )
+            runtime_bytes = resolved_runtime_path.read_bytes()
             runtime_sha = hashlib.sha256(runtime_bytes).hexdigest()
             if runtime_sha != rec.sha256:
                 raise ValueError(
@@ -1062,7 +1189,17 @@ def run_ui_inference(
             bid_best: dict[ButtonId, ButtonState] = {}
             for s in sorted(
                 validated_states,
-                key=lambda x: (-float(x.confidence), x.button_id.name),
+                key=lambda x: (
+                    -float(x.confidence),
+                    x.button_id.name,
+                    x.label,
+                    x.roi.x,
+                    x.roi.y,
+                    x.roi.width,
+                    x.roi.height,
+                    x.is_visible,
+                    x.is_enabled,
+                ),
             ):
                 if s.button_id not in bid_best:
                     bid_best[s.button_id] = s
@@ -1084,7 +1221,7 @@ def run_ui_inference(
                     ]
                     threshold = min(thresholds) if thresholds else 1.0
                     conf_f = float(b_state.confidence)
-                    visible = conf_f >= threshold
+                    visible = b_state.is_visible and conf_f >= threshold
                     # Fix A: malformed state must never produce enabled button
                     # Fix A: visible=false must always imply enabled=false
                     enabled = (b_state.is_enabled and visible)
@@ -1125,7 +1262,7 @@ def run_ui_inference(
                 # Fix E: resolve normalized ROI to pixel Rect at runtime
                 roi = config.resolve_ocr_roi(oid)
                 raw_ocr = adapters.ocr_detector.recognize(frame, roi, whitelist=o_cfg.whitelist)
-                valid_ocr = _validate_ocr_text(raw_ocr)
+                valid_ocr = _validate_ocr_text(raw_ocr, roi, vp_w, vp_h)
                 text = valid_ocr.text
                 confidence = float(valid_ocr.confidence)
                 if confidence < config.ocr_minimum_confidence:
@@ -1175,7 +1312,7 @@ def run_ui_inference(
                     previous_card_counts=previous_card_counts,
                     current_card_counts=current_card_counts,
                 )
-                detection = _validate_turn_detection(raw_detection)
+                detection = _validate_turn_detection(raw_detection, vp_w, vp_h)
             except Exception as e:
                 failures.append(UiFailureRecord(
                     fid,
@@ -1193,12 +1330,15 @@ def run_ui_inference(
         consensus_failure = False
         try:
             raw_consensus = adapters.turn_consensus.observe(bot_id, detection)
-            consensus_result = _validate_consensus_result(raw_consensus)
+            consensus_result = _validate_consensus_result(raw_consensus, detection)
             if consensus_result.turn_owner is not None:
                 turn_owner = consensus_result.turn_owner.name
             obs = consensus_result.observed_frames
             mat = consensus_result.matching_frames
-            latest_match = (detection.turn_owner == consensus_result.turn_owner)
+            latest_match = (
+                consensus_result.turn_owner is not None
+                and detection.turn_owner == consensus_result.turn_owner
+            )
         except Exception as e:
             failures.append(UiFailureRecord(
                 fid,
@@ -1256,6 +1396,7 @@ def run_ui_inference(
         config_sha256=config.config_sha256,
         dataset_id=source.dataset_id,
         input_sha256=source.input_sha256,
+        max_output_bytes=config.resource_limits["max_output_bytes"],
     )
 
 # ------------------------------------------------------------------ #
@@ -1370,8 +1511,10 @@ def write_ui_inference_result(
 
     # Fix G: check total output bytes before writing
     total_out = len(pred_bytes) + len(fail_bytes) + len(manifest_bytes) + len(run_meta_bytes)
-    if total_out > _HARD_MAX_OUTPUT_BYTES:
-        raise ValueError(f"Total output bytes {total_out} exceeds limit {_HARD_MAX_OUTPUT_BYTES}")
+    if total_out > result.max_output_bytes:
+        raise ValueError(
+            f"Total output bytes {total_out} exceeds limit {result.max_output_bytes}"
+        )
 
     # Fix G: Transactional directory — stage in sibling temp, atomically rename to final
     out.parent.mkdir(parents=True, exist_ok=True)
