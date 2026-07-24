@@ -42,7 +42,7 @@ Meaning:
 | M1.4 | Operator launcher UI | Done | High | GUI launcher can scan instances, select one, start/stop a bot session, copy binding stubs, and show live logs | Add live preview and persistent profiles |
 | M1.5 | Log readability | In Progress | Medium | Logs now prefer emulator `title` over IP and watchdog logs are summarized instead of spammy | Add colored severity, filters, and save/export log support |
 | M1.6 | Graceful stop behavior | Done | Medium | Launcher sends a cross-platform graceful stop request and waits before force-kill fallback; session handles SIGINT/SIGTERM | Add a live Windows operator verification record |
-| M2.1 | Capture backend | In Progress | High | Window-bound capture plus read-only launcher preview exists; merged in `ff4822b` | Verify preview against a real MEmu window and document frame stability/cleanup |
+| M2.1 | Capture backend | Done | High | Window-bound capture plus read-only launcher preview merged in `ff4822b`; 20-frame real MEmu soak evidence recorded in `docs/acceptance/capture/0.1.0/` | Keep live soak as a regression gate when perception/action wiring changes |
 | M2.2 | Snapshot validation | In Progress | High | Duplicate-card and identity checks exist in scaffold | Add real table/hand/anchor validation rules from game visuals |
 | M2.3 | Perception pipeline | Next | High | Inference service contract exists | Plug in YOLO/OCR and ROI preprocessing per bot |
 | M2.4 | State extraction | Next | High | Basic adapter exists | Build real game-state parser from perception outputs |
@@ -77,8 +77,8 @@ These are the biggest missing pieces before the bot can play a real match:
 
 Build in this order to keep momentum and reduce rework:
 
-1. `M2.1` Live MEmu capture verification and preview soak.
-2. `M2.3` Perception pipeline wiring with ROI preprocessing.
+1. `M2.3` Perception pipeline wiring with ROI preprocessing.
+2. `M2.4` State extraction from perception outputs.
 3. `M2.4` State extraction from perception outputs.
 4. `M2.4` State extraction from perception outputs.
 5. `M3.2` Action execution with coordinate mapping.
