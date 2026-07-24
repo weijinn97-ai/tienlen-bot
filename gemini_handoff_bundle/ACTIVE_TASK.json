@@ -1,22 +1,22 @@
 {
   "schema_version": 1,
   "agent": "Google Gemini",
-  "task_id": "GEMINI-PERCEPTION-UI-01A",
+  "task_id": "GEMINI-PERCEPTION-UI-01B",
   "issue": 8,
-  "instruction_file": "gemini_handoff_bundle/tasks/GEMINI_PERCEPTION_UI_01A_VI.md",
-  "baseline_ref": "gemini-perception-ui-01a-baseline",
-  "required_branch": "agent/gemini-perception-ui-01a",
+  "instruction_file": "gemini_handoff_bundle/tasks/GEMINI_PERCEPTION_UI_01B_VI.md",
+  "baseline_ref": "gemini-perception-ui-01b-baseline",
+  "required_branch": "agent/gemini-perception-ui-01b",
   "checkout_directory": "tienlen-bot-gemini",
-  "output_directory": "GEMINI_PERCEPTION_UI_01A_OUTPUT",
+  "output_directory": "GEMINI_PERCEPTION_UI_01B_OUTPUT",
   "status": "ACTIVE",
   "policy": "deny_by_default",
   "allowed_new_paths": [
-    "bot/perception/ui_evaluation.py",
-    "tools/evaluate_perception_ui.py",
-    "tests/test_perception_ui_evaluation.py",
-    "tests/fixtures/perception_ui/**",
-    "docs/acceptance/perception-ui/0.3.0/**",
-    "GEMINI_PERCEPTION_UI_01A_OUTPUT/**"
+    "bot/perception/ui_inference_runner.py",
+    "tools/run_perception_ui_replay.py",
+    "tests/test_perception_ui_inference_runner.py",
+    "tests/fixtures/perception_ui_runner/**",
+    "docs/acceptance/perception-ui/0.4.0/**",
+    "GEMINI_PERCEPTION_UI_01B_OUTPUT/**"
   ],
   "allowed_existing_file_modifications": [
     "bot/perception/__init__.py"
@@ -28,15 +28,19 @@
     "git_reset_hard",
     "git_clean",
     "delete_or_rename_files",
+    "modify_ui_evaluator_or_its_accepted_evidence",
     "modify_contracts_or_serialization",
     "modify_existing_perception_detectors",
-    "modify_action_state_runtime_or_replay",
-    "modify_existing_tests",
-    "modify_raw_dataset_or_existing_fixtures",
+    "modify_action_state_runtime_replay_or_capture",
+    "modify_existing_tests_or_fixtures",
+    "read_ground_truth_during_inference",
+    "modify_raw_dataset",
     "train_or_commit_model_weights",
-    "claim_production_metrics_without_locked_data",
+    "execute_adb_taps_or_unattended_gameplay",
+    "claim_production_metrics_without_owner_locked_data",
     "change_module_status_or_registry",
     "install_new_dependencies",
+    "modify_ci_guard_or_active_task",
     "start_next_task_without_new_active_policy"
   ]
 }
