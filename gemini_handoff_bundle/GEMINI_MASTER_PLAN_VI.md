@@ -126,3 +126,14 @@ Task dang `ACTIVE` la `GEMINI-PERCEPTION-UI-01B`: read-only inference runner tao
 prediction evaluator-compatible. Chi file trong `ACTIVE_TASK.json` duoc cap
 quyen. Calibration va production qualification se la 01C rieng sau khi owner
 duyet locked dataset; Gemini khong duoc tu bat dau.
+
+## 7. Training data lock (owner-approved addendum)
+
+The detailed, enforceable training requirements are maintained in
+`docs/TRAINING_PLAN_FINAL.md`. Agents must treat that file as the source of
+truth for dataset intake, annotation, split, training, and production gates.
+
+The current dataset remains `BLOCKED_ON_DATA`: it has only the legacy 36
+`MY_HAND` images, no production annotations, no real validation/test split,
+and no locked UI-negative set. No agent may train or claim production
+qualification until the checklist in `docs/TRAINING_PLAN_FINAL.md` is complete.
