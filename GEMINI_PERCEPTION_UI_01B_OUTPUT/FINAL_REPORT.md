@@ -4,7 +4,7 @@
 - Baseline commit: `9123abaecd59b001ff679fefcb1fcfc2490dbb71`
 - Branch: `agent/gemini-perception-ui-01b`
 - Implementation commit: `a092aff` (`Fix R3 perception runner safety and cross-platform gates`)
-- Evidence commit: the commit containing this report
+- Evidence correction: this follow-up evidence-only commit
 
 ## Delivered
 
@@ -16,6 +16,13 @@
 - Real cross-platform subprocess tests for CLI exit codes 0, 1, 2, and 3.
 - Atomic four-file output with configured output-size enforcement.
 
+## Final line counts
+
+- `bot/perception/ui_inference_runner.py`: 1546
+- `bot/perception/__init__.py`: 113
+- `tools/run_perception_ui_replay.py`: 179
+- `tests/test_perception_ui_inference_runner.py`: 1739
+
 ## Verification
 
 - Focused runner suite: `72/72 OK`.
@@ -25,6 +32,8 @@
 - Scope guard: passed.
 - Baseline diff check: passed.
 - Evidence checksum verification: passed for every listed artifact.
+- Two-run deterministic artifact hashes: matched for predictions, failures, and manifest.
+- Consumed source/config/template/frame hashes: unchanged before and after inference.
 
 ## Scope and production status
 
