@@ -54,6 +54,7 @@ from bot.perception.ui_inference_runner import (
     UiInferenceResult,
     UiInferenceFrameRecord,
     OcrFieldConfig,
+    NormalizedOcrRoi,
     ButtonTemplateConfig,
 )
 
@@ -107,5 +108,6 @@ __all__ = [
     "UiInferenceResult",
     "UiInferenceFrameRecord",
     "OcrFieldConfig",
+    "NormalizedOcrRoi",
     "ButtonTemplateConfig",
 ]
