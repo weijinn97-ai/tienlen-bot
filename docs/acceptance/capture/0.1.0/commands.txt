@@ -1,0 +1,4 @@
+py -3 -c "from bot.discovery.adb_discovery import scan_memu_adb_bindings; print(scan_memu_adb_bindings())"
+py -3 -c "from bot.capture.windows_capture import WindowsCapture; ... capture one frame ..."
+py -3 -c "from bot.capture.windows_capture import WindowsCapture; ... capture 20 frames and report shape/latency/hash ..."
+py -3 -m unittest discover -s tests -p "test_preview.py" -v
