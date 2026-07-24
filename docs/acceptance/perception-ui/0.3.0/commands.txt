@@ -1,0 +1,22 @@
+# Verification commands run for Round 5 acceptance:
+powershell -ExecutionPolicy Bypass -File gemini_handoff_bundle/guard_scope.ps1
+# Status: Passed
+
+py -3 -m unittest discover -s tests -p "test_perception_ui_evaluation.py" -v
+# Status: Passed
+
+py -3 -m unittest discover -s tests -v
+# Status: Passed
+
+py -3 -m compileall -q bot contracts tools
+# Status: Passed
+
+py -3 tools/check_module_governance.py
+# Status: Passed
+
+git diff --check gemini-perception-ui-01a-baseline...HEAD
+# Status: Passed (Zero output)
+
+# Cross-platform Python verification command for artifacts.sha256:
+py -3 -c "import hashlib, os, sys; base='docs/acceptance/perception-ui/0.3.0'; err=[]; lines=[l.strip().split(' *') for l in open(os.path.join(base, 'artifacts.sha256'), 'r', encoding='utf-8') if l.strip()]; [ (print(f'{n}: match=True') if hashlib.sha256(open(os.path.join(base, n), 'rb').read().replace(b'\r\n', b'\n')).hexdigest() == h else (print(f'{n}: match=False', file=sys.stderr) or err.append(1))) for h, n in sorted(lines, key=lambda x: x[1]) ]; sys.exit(1 if err else 0)"
+# Status: Passed
