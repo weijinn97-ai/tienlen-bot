@@ -115,3 +115,14 @@ Gemini không được coi task catalog là whitelist và không được tự s
 ## 5. Điều kiện hoàn thành dự án
 
 Unit test hoặc một vài demo không đủ. Dự án chỉ production-ready khi locked replay, model metrics, capture soak, state exactness, 100 supervised actions, single-bot soak và multi-bot isolation đều có evidence/checksum có thể chạy lại.
+
+## 6. Active override - 2026-07-24
+
+`GEMINI-PERCEPTION-UI-01A` da merge tai PR #28. Evaluator `0.3.0` duoc chap
+nhan, nhung production data gate van `BLOCKED` va `MOD-PERCEPTION` van
+`IN_PROGRESS`.
+
+Task dang `ACTIVE` la `GEMINI-PERCEPTION-UI-01B`: read-only inference runner tao
+prediction evaluator-compatible. Chi file trong `ACTIVE_TASK.json` duoc cap
+quyen. Calibration va production qualification se la 01C rieng sau khi owner
+duyet locked dataset; Gemini khong duoc tu bat dau.

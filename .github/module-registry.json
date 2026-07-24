@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated": "2026-07-23",
+  "updated": "2026-07-24",
   "status_flow": ["PLANNED", "IN_PROGRESS", "CANDIDATE", "LOCKED", "DEPRECATED"],
   "modules": [
     {
@@ -31,7 +31,7 @@
       "id": "MOD-PERCEPTION",
       "name": "Cards, buttons, OCR and turn perception",
       "status": "IN_PROGRESS",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "owner": "@weijinn97-ai",
       "paths": [
         "bot/perception/__init__.py",
@@ -39,13 +39,14 @@
         "bot/perception/fan_cards.py",
         "bot/perception/ocr.py",
         "bot/perception/turn_owner.py",
+        "bot/perception/ui_evaluation.py",
         "bot/perception/yolo_cards.py",
         "requirements-perception.txt",
         "data/templates/**"
       ],
       "public_api": ["bot.perception"],
-      "tests": ["tests/test_fan_cards.py", "tests/test_live_gameplay_perception.py", "tests/test_model_perception.py", "tests/test_ocr.py", "tests/test_turn_owner.py"],
-      "evidence": "docs/acceptance/perception-ui/0.2.0/",
+      "tests": ["tests/test_fan_cards.py", "tests/test_live_gameplay_perception.py", "tests/test_model_perception.py", "tests/test_ocr.py", "tests/test_turn_owner.py", "tests/test_perception_ui_evaluation.py"],
+      "evidence": "docs/acceptance/perception-ui/0.3.0/",
       "blocked_by": ["MOD-CONTRACTS", "MOD-DISCOVERY-CAPTURE"]
     },
     {
