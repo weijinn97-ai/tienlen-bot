@@ -10,6 +10,7 @@ import tkinter as tk
 from tkinter import messagebox, ttk
 
 from bot.discovery.adb_discovery import BindingCandidate, scan_memu_adb_bindings
+from bot.ui.process_control import creation_flags, force_stop, request_graceful_stop
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -31,6 +32,7 @@ class BotLauncherApp:
         self.process: subprocess.Popen[str] | None = None
         self.process_reader: Thread | None = None
         self.selected_vm_index: int | None = None
+        self._stop_callback = None
 
         self.status_var = tk.StringVar(value="Ready")
         self.selected_var = tk.StringVar(value="No emulator selected")
@@ -218,7 +220,7 @@ class BotLauncherApp:
             "--vm-index",
             str(candidate.vm_index),
         ]
-        creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0) | creation_flags()
         env = os.environ.copy()
         env["PYTHONUNBUFFERED"] = "1"
 
@@ -252,14 +254,18 @@ class BotLauncherApp:
         self.process_reader = Thread(target=self._read_process_output, daemon=True)
         self.process_reader.start()
 
-    def stop_bot(self) -> None:
+    def stop_bot(self, on_stopped=None) -> None:
         if self.process is None or self.process.poll() is not None:
             self._append_log("INFO", "No running bot session to stop.")
+            if on_stopped is not None:
+                on_stopped()
             return
 
         self._append_log("INFO", "Stopping bot session...")
-        self.process.terminate()
-        self.root.after(1500, self._kill_if_still_running)
+        self._stop_callback = on_stopped
+        action = request_graceful_stop(self.process)
+        self._append_log("INFO", f"Graceful stop request: {action}.")
+        self.root.after(100, self._poll_stop)
 
     def copy_selected_binding(self) -> None:
         candidate = self._selected_candidate()
@@ -346,13 +352,30 @@ class BotLauncherApp:
     def _append_log(self, level: str, message: str) -> None:
         self.log_queue.put(f"[{level}] {message}")
 
-    def _kill_if_still_running(self) -> None:
+    def _poll_stop(self) -> None:
         if self.process is None or self.process.poll() is not None:
             self.status_var.set("Bot session stopped")
+            callback, self._stop_callback = self._stop_callback, None
+            if callback is not None:
+                callback()
             return
-        self.process.kill()
-        self._append_log("WARN", "Bot session required force kill after terminate timeout.")
-        self.status_var.set("Bot session force-stopped")
+
+        callback = self._stop_callback
+        self._stop_callback = None
+        if callback is not None:
+            self.root.after(1500, lambda: self._finish_stop(callback))
+        else:
+            self.root.after(1500, self._finish_stop)
+
+    def _finish_stop(self, callback=None) -> None:
+        if self.process is None or self.process.poll() is not None:
+            self.status_var.set("Bot session stopped")
+        else:
+            if force_stop(self.process):
+                self._append_log("WARN", "Bot session required force kill after graceful-stop timeout.")
+            self.status_var.set("Bot session force-stopped")
+        if callback is not None:
+            callback()
 
     def _on_close(self) -> None:
         if self.process is not None and self.process.poll() is None:
@@ -361,7 +384,8 @@ class BotLauncherApp:
                 "A bot session is still running. Stop it and exit?",
             ):
                 return
-            self.stop_bot()
+            self.stop_bot(on_stopped=self.root.destroy)
+            return
         self.root.destroy()
 
     @staticmethod
