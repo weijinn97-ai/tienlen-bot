@@ -1,24 +1,20 @@
 {
   "schema_version": 1,
   "agent": "Google Gemini",
-  "task_id": "GEMINI-PERCEPTION-UI-01B",
-  "issue": 8,
-  "instruction_file": "gemini_handoff_bundle/tasks/GEMINI_PERCEPTION_UI_01B_VI.md",
-  "baseline_ref": "gemini-perception-ui-01b-baseline",
-  "required_branch": "agent/gemini-perception-ui-01b",
-  "checkout_directory": "tienlen-bot-gemini",
-  "output_directory": "GEMINI_PERCEPTION_UI_01B_OUTPUT",
-  "status": "PAUSED_FOR_OWNER_REVIEW",
-  "pause_reason": "GEMINI-PERCEPTION-UI-01B delivery is complete; no new coding task is authorized until the owner approves a new active policy.",
-  "paused_at": "2026-07-25",
+  "task_id": "M2.3-PERCEPTION-PIPELINE-01",
+  "issue": 14,
+  "instruction_file": "gemini_handoff_bundle/tasks/M2_3_PERCEPTION_PIPELINE_01.md",
+  "baseline_ref": "64a8938",
+  "required_branch": "agent/m2-3-perception-pipeline",
+  "checkout_directory": "tienlen-bot-m2-3",
+  "output_directory": "M2_3_PERCEPTION_PIPELINE_OUTPUT",
+  "status": "ACTIVE",
   "policy": "deny_by_default",
   "allowed_new_paths": [
-    "bot/perception/ui_inference_runner.py",
-    "tools/run_perception_ui_replay.py",
-    "tests/test_perception_ui_inference_runner.py",
-    "tests/fixtures/perception_ui_runner/**",
-    "docs/acceptance/perception-ui/0.4.0/**",
-    "GEMINI_PERCEPTION_UI_01B_OUTPUT/**"
+    "bot/perception/pipeline.py",
+    "tests/test_perception_pipeline.py",
+    "docs/acceptance/perception/0.1.0/**",
+    "M2_3_PERCEPTION_PIPELINE_OUTPUT/**"
   ],
   "allowed_existing_file_modifications": [
     "bot/perception/__init__.py"
