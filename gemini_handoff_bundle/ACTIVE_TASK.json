@@ -4,7 +4,7 @@
   "task_id": "M2.3-PERCEPTION-PIPELINE-01",
   "issue": 14,
   "instruction_file": "gemini_handoff_bundle/tasks/M2_3_PERCEPTION_PIPELINE_01.md",
-  "baseline_ref": "64a8938",
+  "baseline_ref": "39ca673",
   "required_branch": "agent/m2-3-perception-pipeline",
   "checkout_directory": "tienlen-bot-m2-3",
   "output_directory": "M2_3_PERCEPTION_PIPELINE_OUTPUT",
