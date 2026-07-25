@@ -1,0 +1,12 @@
+{
+  "status": "CANDIDATE",
+  "task_id": "M2.3-PERCEPTION-PIPELINE-01",
+  "focused_tests": 7,
+  "full_tests": 315,
+  "compile": "pass",
+  "governance": "pass",
+  "scope_guard": "pending",
+  "diff_check": "pending",
+  "production_qualification": "BLOCKED",
+  "training_authorized": false
+}
