@@ -5,8 +5,8 @@
   "full_tests": 315,
   "compile": "pass",
   "governance": "pass",
-  "scope_guard": "pending",
-  "diff_check": "pending",
+  "scope_guard": "pass",
+  "diff_check": "pass",
   "production_qualification": "BLOCKED",
   "training_authorized": false
 }
