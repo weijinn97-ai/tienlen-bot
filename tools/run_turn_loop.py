@@ -69,6 +69,9 @@ FRAME_SHAPE = (720, 1280, 3)
 TAP_CHANGE_FRACTION = 0.10
 TAP_CHANGE_INTENSITY = 40
 
+# How long to let the game act on a play before deciding it was refused.
+REFUSAL_CHECK_SECONDS = 0.6
+
 
 def log(message: str, level: str = "INFO") -> None:
     now = datetime.now().strftime("%H:%M:%S")
@@ -175,6 +178,32 @@ class Screen:
         return self.grab_device()
 
 
+def hand_cell_count(snapshot) -> int:
+    """How many cards are in the fan, whether or not the reader could name them."""
+    return sum(
+        1 for card in snapshot.cards
+        if card.zone in (CardZone.MY_HAND, CardZone.SELECTED)
+    )
+
+
+def give_up_turn(controller, outcome) -> None:
+    """Clear any selection and pass, so a refused play costs a turn not a round."""
+    for card in outcome.snapshot.cards:
+        if card.zone is CardZone.SELECTED:
+            controller.tap(
+                card.roi.x + card.roi.width // 2, card.roi.y + card.roi.height // 2
+            )
+    passer = next(
+        (b for b in outcome.snapshot.buttons
+         if b.button_id is ButtonId.PASS and b.is_visible and b.is_enabled),
+        None,
+    )
+    if passer is not None:
+        controller.tap(
+            passer.roi.x + passer.roi.width // 2, passer.roi.y + passer.roi.height // 2
+        )
+
+
 def describe(outcome) -> str:
     if outcome.snapshot is None:
         return "khung bi tu choi"
@@ -271,7 +300,7 @@ def main() -> int:
         f"| nhip={args.interval}s | toi_da={args.max_steps} buoc"
     )
 
-    acted = cancelled = read_failures = rounds = 0
+    acted = cancelled = read_failures = rounds = refused = 0
     last_signature, repeats = None, 0
     last_signature = None
     for step in range(args.max_steps):
@@ -361,6 +390,11 @@ def main() -> int:
         signature = (tuple(outcome.plan.cards), describe(outcome))
         repeated = signature == last_signature
         last_signature = signature
+        # Counting hand cells is the most dependable measurement available: the
+        # boxes are found from the white mask alone, so they survive the reader
+        # failing to name the cards. If a play went through, this number drops.
+        cells = hand_cell_count(outcome.snapshot)
+
         screen.reference = image
         try:
             taps = executor.execute(
@@ -371,12 +405,35 @@ def main() -> int:
             log(f"   da bam {len(taps)} lan{note}: {[(t.target, t.x, t.y) for t in taps]}")
         except ValueError as exc:
             log(f"   khong thuc hien duoc: {exc}", "WARN")
+
+        # The game refuses a play that breaks the rules and says so on screen,
+        # but it says it in Vietnamese text over the fan; the count is easier to
+        # read and means the same thing. A refusal almost always means the table
+        # was misread - the bot believed it was leading and was not - so trying
+        # the same cards again cannot work, and repeating it is what burned whole
+        # rounds. Passing is always legal, ends the turn cleanly, and costs one
+        # turn instead of the round.
+        if args.act and outcome.plan is not None and outcome.plan.kind is ActionKind.PLAY:
+            time.sleep(REFUSAL_CHECK_SECONDS)
+            follow = screen.grab()
+            if follow is not None:
+                later = loop.step(
+                    FrameEnvelope.create(
+                        bot_id="live", hwnd=0, adb_serial=args.serial, image=follow,
+                        source=CaptureSource.WINDOWS_GRAPHICS_CAPTURE, sequence=step,
+                    )
+                )
+                if later.snapshot is not None and hand_cell_count(later.snapshot) >= cells:
+                    refused += 1
+                    log(f"   nuoc di bi tu choi (van {cells} o bai) -> bo luot", "WARN")
+                    give_up_turn(controller, later)
+
         # No sleep here on purpose. The countdown is already running; if this
         # attempt did not land, the next look should happen inside the same turn.
 
     log(
-        f"Ket thuc | da danh={acted} | da huy tu dong={cancelled} | "
-        f"van moi={rounds} | khung loi={read_failures}"
+        f"Ket thuc | da danh={acted} | bi tu choi={refused} | "
+        f"da huy tu dong={cancelled} | van moi={rounds} | khung loi={read_failures}"
     )
     return 0
 

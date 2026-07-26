@@ -57,15 +57,37 @@ class ActionPipelineTests(unittest.TestCase):
         self.assertEqual(controller.taps, [(130, 650), (1060, 630)])
         self.assertEqual(len(taps), 2)
 
-    def test_refuses_action_when_required_button_is_missing(self) -> None:
-        with self.assertRaisesRegex(ValueError, "play button"):
+    def test_refuses_a_pass_when_its_button_is_missing(self) -> None:
+        with self.assertRaisesRegex(ValueError, "pass button"):
             ActionPlanBuilder().build(
-                {"action": "play", "cards": ["3S"]},
+                {"action": "pass"},
                 PerceptionSnapshot(
                     bot_id="bot-1",
                     frame_id="frame-1",
                     frame_ts=1,
                     confidence=0.9,
+                ),
+            )
+
+    def test_a_play_does_not_need_its_button_yet(self) -> None:
+        """Responding to another player, the game shows only "Bỏ Lượt"; "Đánh"
+        appears once a legal selection exists. Demanding it before the cards are
+        selected refused every response the bot ever wanted to make."""
+        state = snapshot()
+        without_play = PerceptionSnapshot(
+            bot_id=state.bot_id, frame_id=state.frame_id, frame_ts=state.frame_ts,
+            confidence=state.confidence, cards=state.cards, buttons=(),
+        )
+        plan = ActionPlanBuilder().build({"action": "play", "cards": ["3S"]}, without_play)
+        self.assertEqual(plan.kind, ActionKind.PLAY)
+        self.assertEqual(plan.cards, ("3S",))
+
+    def test_refuses_a_play_whose_cards_are_not_on_screen(self) -> None:
+        with self.assertRaisesRegex(ValueError, "missing from perception"):
+            ActionPlanBuilder().build(
+                {"action": "play", "cards": ["3S"]},
+                PerceptionSnapshot(
+                    bot_id="bot-1", frame_id="frame-1", frame_ts=1, confidence=0.9,
                 ),
             )
 

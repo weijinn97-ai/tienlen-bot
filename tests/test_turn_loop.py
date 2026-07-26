@@ -134,14 +134,25 @@ class TurnLoopTests(unittest.TestCase):
         self.assertIsNone(outcome.snapshot)
         self.assertIsNone(outcome.plan)
 
-    def test_it_waits_when_the_plan_cannot_be_built(self) -> None:
-        """The rules engine can call a play the screen cannot support: here the
-        hand beats the table, so the answer is PLAY, but no "Đánh" button is
-        visible. That means the frame moved on, so the answer is a fresh frame."""
+    def test_a_response_is_planned_before_the_play_button_appears(self) -> None:
+        """The game shows only "Bỏ Lượt" until a legal selection exists, so a
+        response has to be planned without "Đánh" on screen. The executor looks
+        for it again after the cards are selected."""
         outcome = build(
             SeatPosition.SELF,
             Buttons(ButtonState(ButtonId.PASS, "Bỏ Lượt", Rect(10, 40, 20, 10), confidence=0.9)),
             cards=Cards(codes=("5S",), table=("4S",)),
+        ).step(make_frame())
+        self.assertEqual(outcome.decision["action"], ActionKind.PLAY.value)
+        self.assertIsNotNone(outcome.plan)
+        self.assertEqual(outcome.plan.cards, ("5S",))
+
+    def test_it_waits_when_the_plan_cannot_be_built(self) -> None:
+        """A pass needs its button; without one there is nothing to press."""
+        outcome = build(
+            SeatPosition.SELF,
+            Buttons(play_button()),
+            cards=Cards(codes=("3S",), table=("4S",)),
         ).step(make_frame())
         self.assertEqual(outcome.decision["action"], ActionKind.WAIT.value)
         self.assertIn("unplannable", outcome.decision["reason"])

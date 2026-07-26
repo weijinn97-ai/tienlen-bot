@@ -81,17 +81,24 @@ class ActionPlanBuilder:
             ),
             None,
         )
-        if button is None:
+        # Responding to another player, the game shows only "Bỏ Lượt"; "Đánh"
+        # appears once a legal selection exists. Requiring it before the cards
+        # are selected refused every response the bot ever wanted to make - it
+        # sat on a pair of 5s and a pair of 8s against a pair of 4s and did
+        # nothing. For a play, the button is looked for again after selection.
+        if button is None and action != ActionKind.PLAY:
             raise ValueError(f"Required {target_button.value} button is not available.")
 
         cards = tuple(validate_card_code(card) for card in decision.get("cards", []))
-        verify_rois = [button.roi]
+        verify_rois = [button.roi] if button is not None else []
         if action == ActionKind.PLAY:
             detections_by_code = playable_by_code(snapshot)
             missing = [card for card in cards if card not in detections_by_code]
             if missing:
                 raise ValueError(f"Cards are missing from perception: {','.join(missing)}")
             verify_rois.extend(detections_by_code[card].roi for card in cards)
+        if not verify_rois:
+            raise ValueError(f"Nothing to verify for a {action.value} action.")
 
         return ActionPlan(
             kind=action,
