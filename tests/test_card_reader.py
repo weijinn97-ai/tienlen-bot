@@ -7,6 +7,8 @@ import numpy as np
 
 from bot.perception.card_reader import (
     FRAME_SHAPE,
+    HAND_RANK_BOX,
+    HAND_SUIT_BOX,
     _suit_by_shape,
     GLYPH_X,
     RANK_Y,
@@ -209,9 +211,11 @@ def render_hand_frame(cards, angle=0.0, origin=(200, 512), stride=140):
         rank, suit = code[:-1], code[-1]
         card = np.zeros((HAND_H, HAND_W, 3), dtype=np.uint8)
         card[:, :] = 255
-        _paste_glyph(card, reader._hand_ranks[rank], 6, 9, 58, 68, BLACK_INK)
+        # Paste into the reader's own windows so the fixture cannot drift away
+        # from the geometry under test.
+        _paste_glyph(card, reader._hand_ranks[rank], *HAND_RANK_BOX, BLACK_INK)
         _paste_glyph(
-            card, reader._hand_suits[suit], 6, 71, 58, 116,
+            card, reader._hand_suits[suit], *HAND_SUIT_BOX,
             RED_INK if suit in RED_SUITS else BLACK_INK,
         )
         if angle:
@@ -252,6 +256,20 @@ class HandZoneTests(unittest.TestCase):
             hand = [c.code for c in cards if c.zone is CardZone.MY_HAND]
             self.assertEqual(set(hand) - {"7D"}, set(), f"misread at {angle} deg")
 
+    def test_tilted_hand_card_is_still_read(self) -> None:
+        """The glyph window must not drift with the fan angle.
+
+        Rotating about the white bounding box's top-left put the origin off the
+        card, and the gap between the two moved with the angle, so a fixed window
+        sampled a moving target and a tilted card was refused even when the same
+        card upright was read. The origin is now re-derived after deskewing, so
+        one card must survive the whole range a real fan spans.
+        """
+        for angle in (-8.0, -5.0, -3.0, 0.0, 2.0):
+            cards = self.reader.detect(render_hand_frame(["5S"], angle=angle))
+            hand = [c.code for c in cards if c.zone is CardZone.MY_HAND]
+            self.assertEqual(hand, ["5S"], f"lost the card at {angle} deg")
+
     def test_deskew_recovers_the_rendered_angle(self) -> None:
         """The angle estimate is what makes the hand readable, so measure it.
 
@@ -263,9 +281,9 @@ class HandZoneTests(unittest.TestCase):
         for angle in (-8.0, -4.0, -1.0):
             frame = render_hand_frame(["7D"], angle=angle)
             white = self.reader._white_mask(frame)
-            boxes = self.reader._hand_boxes(frame, white)
+            boxes, _labels = self.reader._hand_boxes(frame, white)
             self.assertTrue(boxes, f"no hand box at {angle} deg")
-            measured = self.reader._top_edge_angle(white, boxes[0])
+            measured = self.reader._top_edge_angle(white, boxes[0][0])
             self.assertIsNotNone(measured)
             # The renderer rotates about the origin with OpenCV's positive-is-
             # counter-clockwise convention; the reader reports the top edge's

@@ -49,9 +49,13 @@ GLYPH_X = (0.02, 0.42)
 # Hand cards render about 1.62x table size. Their box height is set by screen
 # clipping rather than by the card, so these windows are absolute pixel offsets
 # from the deskewed card's top-left corner instead of fractions of the box.
+# Measured over 1329 hand cells against the corrected origin: the rank glyph
+# spans x 14-61, y 7-76 (sd 1.8 top, 1.2 bottom) and the pip x 17-58, y 77-117.
+# The windows sit just outside that, and the boundary at 77 keeps the pip out of
+# the rank window and the digits out of the pip window.
 HAND_SCALE = 1.62
-HAND_RANK_BOX = (6, 9, 58, 68)
-HAND_SUIT_BOX = (6, 71, 58, 116)
+HAND_RANK_BOX = (12, 5, 63, 77)
+HAND_SUIT_BOX = (15, 77, 60, 119)
 HAND_EDGE_SAMPLE = 60
 MIN_EDGE_POINTS = 10
 
@@ -134,17 +138,21 @@ def _suit_by_shape(crop: np.ndarray) -> str | None:
     clubs with spades, scoring 81.1% on the labelled hand set, because resizing a
     near-square pip into the rank glyph box washes the shapes together.
 
-    Counting convex-hull defects instead separates them by construction - a club
-    has three lobes, a diamond is convex, a heart has one notch, a spade has a
-    stem. Measured over the labelled hand cards:
+    Counting convex-hull defects instead separates them far better - a club has
+    three lobes, a diamond is convex, a heart has one notch, a spade has a stem.
+    Colour has already split red from black, so only D-vs-H and S-vs-C remain.
 
-        diamond  0 defects (4/4)      heart  1 defect  (10/10)
-        spade    0 or 2 defects       club   3 or 4 defects (6/6)
+    Those two questions are not equally settled. Red is clean: on 156 labelled
+    pips diamonds sit at 0 defects 78/78 and hearts never crossed over, so the
+    split is exact. Black is not. An independent check on the same 156 samples
+    found 3 of 79 spades reaching 3 defects and 11 of 77 clubs falling below it,
+    so the classes overlap and no threshold closes the gap - the ceiling for any
+    single one of solidity, defect count or defect depth is about 95.5%. The
+    shipped rule scores 95.9% on black pips it does not refuse. Separating them
+    reliably needs a second feature, not a re-tuned constant.
 
-    Colour has already split red from black, so only D-vs-H and S-vs-C remain,
-    and the defect count decides both without overlap: 37/37, against 30/37 for
-    the bitmap. Solidity is kept as a guard so an unexpected shape is refused
-    rather than forced into the nearest class.
+    Solidity is kept as a guard so an unexpected shape is refused rather than
+    forced into the nearest class.
     """
     grey = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
     _, ink = cv2.threshold(grey, INK_THRESHOLD, 255, cv2.THRESH_BINARY_INV)
@@ -228,10 +236,11 @@ class CardReader:
             self._collect(detections, image, box, CardZone.TABLE, self._classify(image, box))
 
         if self._hand_ranks is not None:
-            for box in self._hand_boxes(image, white):
+            boxes, labels = self._hand_boxes(image, white)
+            for box, index in boxes:
                 self._collect(
                     detections, image, box, CardZone.MY_HAND,
-                    self._classify_hand(image, box, white),
+                    self._classify_hand(image, box, white, labels, index),
                 )
 
         return tuple(
@@ -263,8 +272,16 @@ class CardReader:
         _, mask = cv2.threshold(grey, WHITE_THRESHOLD, 255, cv2.THRESH_BINARY)
         return mask
 
-    def _hand_boxes(self, image: np.ndarray, white: np.ndarray) -> list[tuple[int, int, int, int]]:
-        count, _, stats, _ = cv2.connectedComponentsWithStats(white, 8)
+    def _hand_boxes(
+        self, image: np.ndarray, white: np.ndarray
+    ) -> tuple[list[tuple[tuple[int, int, int, int], int]], np.ndarray]:
+        """Return each hand cell with its component label, plus the label image.
+
+        The label travels with the box because deskewing later needs this card's
+        pixels alone, and a cropped patch can split a component so that its
+        bounding box no longer identifies it.
+        """
+        count, labels, stats, _ = cv2.connectedComponentsWithStats(white, 8)
         boxes = []
         for index in range(1, count):
             x = int(stats[index, cv2.CC_STAT_LEFT])
@@ -276,8 +293,8 @@ class CardReader:
                 and HAND_HEIGHT[0] <= height <= HAND_HEIGHT[1]
                 and y > HAND_MIN_Y
             ):
-                boxes.append((x, y, width, height))
-        return sorted(boxes)
+                boxes.append(((x, y, width, height), index))
+        return sorted(boxes), labels
 
     @staticmethod
     def _top_edge_angle(white: np.ndarray, box: tuple[int, int, int, int]) -> float | None:
@@ -295,7 +312,12 @@ class CardReader:
         return float(np.degrees(np.arctan(slope)))
 
     def _classify_hand(
-        self, image: np.ndarray, box: tuple[int, int, int, int], white: np.ndarray
+        self,
+        image: np.ndarray,
+        box: tuple[int, int, int, int],
+        white: np.ndarray,
+        labels: np.ndarray,
+        index: int,
     ) -> tuple[str, float] | None:
         angle = self._top_edge_angle(white, box)
         if angle is None:
@@ -310,11 +332,15 @@ class CardReader:
             return None
         centre = (float(x - x0), float(y - y0))
         matrix = cv2.getRotationMatrix2D(centre, angle, 1.0)
+        size = (patch.shape[1], patch.shape[0])
         upright = cv2.warpAffine(
-            patch, matrix, (patch.shape[1], patch.shape[0]),
+            patch, matrix, size,
             flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE,
         )
-        cx, cy = int(centre[0]), int(centre[1])
+        origin = self._upright_origin(labels[y0:y1, x0:x1], index, matrix, size)
+        if origin is None:
+            return None
+        cx, cy = origin
         crops = []
         for bx0, by0, bx1, by1 in (HAND_RANK_BOX, HAND_SUIT_BOX):
             crop = upright[cy + by0 : cy + by1, cx + bx0 : cx + bx1]
@@ -322,6 +348,32 @@ class CardReader:
                 return None
             crops.append(crop)
         return self._decide_hand(crops[0], crops[1])
+
+    @staticmethod
+    def _upright_origin(
+        label_patch: np.ndarray,
+        index: int,
+        matrix: np.ndarray,
+        size: tuple[int, int],
+    ) -> tuple[int, int] | None:
+        """Locate the card's own top-left corner after the patch is deskewed.
+
+        Rotating about the bounding box's top-left is convenient but wrong: for a
+        tilted card that point is not on the card at all, and the gap between the
+        two moves with the fan angle (measured over 2058 hand cells, the offset
+        correlates +0.86 in x and -0.96 in y with the angle). A fixed glyph window
+        anchored there samples a moving target. Once the card is upright its own
+        component's bounding box starts at its corner, so re-deriving the origin
+        after the rotation removes the angle dependence without a fitted constant.
+        """
+        own = cv2.warpAffine(
+            ((label_patch == index) * 255).astype(np.uint8), matrix, size,
+            flags=cv2.INTER_NEAREST, borderMode=cv2.BORDER_CONSTANT, borderValue=0,
+        )
+        ys, xs = np.nonzero(own)
+        if len(xs) == 0:
+            return None
+        return int(xs.min()), int(ys.min())
 
     def _decide_hand(self, rank_crop, suit_crop) -> tuple[str, float] | None:
         rank_glyph = _normalise_glyph(rank_crop)
