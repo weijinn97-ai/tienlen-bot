@@ -104,7 +104,27 @@ Where frames stop:
 | `unplannable` | 8 |
 | `respond_single` / `respond_four_of_a_kind` (acted) | 6 |
 
-## 6. Known limits
+## 6. Running it against a live emulator
+
+```
+py -3 tools/run_turn_loop.py --serial 127.0.0.1:23523            # dry run
+py -3 tools/run_turn_loop.py --serial 127.0.0.1:23523 --act      # plays
+```
+
+Dry run reads the screen, decides, prints the decision and taps nothing. `--act`
+lets it play and wires `refresh_snapshot`, which is what closes the disabled-
+button gap in §6.
+
+**Auto-play recovery follows `--act`, deliberately.** Taking the turn back and
+then not playing it just lets the clock run out and auto-play re-engage, one
+round poorer. Cancelling is only an improvement if something is going to play the
+turn, so a dry run reports the state and leaves it alone.
+
+Capture is `adb exec-out screencap`, which the architecture rules bar from the
+production hot path. This is an operator tool; the runtime capture path stays
+Windows-side and HWND-bound.
+
+## 7. Known limits
 
 - **`invalid_target_combo`, 34 frames.** The table cards that were read do not
   form a legal Tien Len combo, so the bot cannot judge what it must beat and
