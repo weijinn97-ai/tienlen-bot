@@ -9,3 +9,6 @@ replay_artifacts/frames/
 replay_artifacts/*.mp4
 replay_artifacts/*.avi
 replay_artifacts/*.log
+
+# Runtime scratch: captured frames must not enter git.
+.runtime/
