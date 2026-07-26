@@ -7,6 +7,7 @@ import numpy as np
 
 from bot.perception.card_reader import (
     FRAME_SHAPE,
+    _suit_by_shape,
     GLYPH_X,
     RANK_Y,
     SUIT_Y,
@@ -303,3 +304,71 @@ class HandZoneTests(unittest.TestCase):
         original = frame.copy()
         self.reader.detect(frame)
         np.testing.assert_array_equal(frame, original)
+
+
+class SuitByShapeTests(unittest.TestCase):
+    """The suit is decided by outline convexity, not by bitmap matching.
+
+    Pips are drawn as polygons whose measured convexity matches what real pips
+    produce (diamonds solidity 0.973-0.998 and 0 defects, hearts ~0.92 and 1,
+    spades 0.874-0.973 and 0-2, clubs 0.811-0.893 and 3-4). The shipped
+    templates cannot serve here: they are the mean of several samples, so
+    re-rendering one yields a blurred blob rather than a faithful pip.
+    """
+
+    @staticmethod
+    def _blank():
+        return np.full((60, 60, 3), 255, dtype=np.uint8)
+
+    def _diamond(self, colour=RED_INK):
+        crop = self._blank()
+        cv2.fillPoly(crop, [np.array([(30, 6), (52, 30), (30, 54), (8, 30)], np.int32)], colour)
+        return crop
+
+    def _heart(self, colour=RED_INK):
+        crop = self._blank()
+        cv2.circle(crop, (21, 24), 13, colour, -1)
+        cv2.circle(crop, (39, 24), 13, colour, -1)
+        cv2.fillPoly(crop, [np.array([(7, 28), (53, 28), (30, 54)], np.int32)], colour)
+        return crop
+
+    def _spade(self, colour=BLACK_INK):
+        crop = self._blank()
+        points = [(30, 8), (44, 30), (46, 38), (34, 40), (34, 46),
+                  (26, 46), (26, 40), (14, 38), (16, 30)]
+        cv2.fillPoly(crop, [np.array(points, np.int32)], colour)
+        return crop
+
+    def _club(self, colour=BLACK_INK):
+        crop = self._blank()
+        cv2.circle(crop, (30, 18), 11, colour, -1)
+        cv2.circle(crop, (18, 34), 11, colour, -1)
+        cv2.circle(crop, (42, 34), 11, colour, -1)
+        cv2.rectangle(crop, (27, 34), (33, 54), colour, -1)
+        return crop
+
+    def test_diamond_is_convex_and_read_as_diamond(self) -> None:
+        self.assertEqual(_suit_by_shape(self._diamond()), "D")
+
+    def test_heart_is_distinguished_from_diamond(self) -> None:
+        """Both are red, so only the notch between the lobes separates them."""
+        self.assertEqual(_suit_by_shape(self._heart()), "H")
+
+    def test_club_is_distinguished_from_spade(self) -> None:
+        """Both are black; the club's three lobes give it extra hull defects."""
+        self.assertEqual(_suit_by_shape(self._club()), "C")
+
+    def test_spade_is_read_as_spade(self) -> None:
+        self.assertEqual(_suit_by_shape(self._spade()), "S")
+
+    def test_colour_gates_the_red_suits(self) -> None:
+        """A diamond drawn in black must never be reported as a red suit."""
+        self.assertNotIn(_suit_by_shape(self._diamond(colour=BLACK_INK)), {"D", "H"})
+
+    def test_blank_crop_is_refused(self) -> None:
+        self.assertIsNone(_suit_by_shape(self._blank()))
+
+    def test_speck_too_small_is_refused(self) -> None:
+        crop = self._blank()
+        cv2.circle(crop, (30, 30), 2, BLACK_INK, -1)
+        self.assertIsNone(_suit_by_shape(crop))
