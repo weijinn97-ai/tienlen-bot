@@ -1,0 +1,30 @@
+{
+  "device_info": {
+    "torch_version": "2.13.0+cu126",
+    "cuda_available": true,
+    "cuda_build": "12.6",
+    "gpu_name": "NVIDIA GeForce GTX 1650",
+    "vram_total_mb": 4096,
+    "compute_capability": "7.5"
+  },
+  "results": {
+    "gpu": {
+      "p50": 25.9,
+      "p95": 27.6,
+      "p99": 28.2,
+      "max": 33.5,
+      "n": 60,
+      "warmup_ms": 2384.0,
+      "device": "cuda:0"
+    },
+    "cpu": {
+      "p50": 132.2,
+      "p95": 142.3,
+      "p99": 144.8,
+      "max": 164.1,
+      "n": 60,
+      "warmup_ms": 184.5,
+      "device": "cpu"
+    }
+  }
+}
