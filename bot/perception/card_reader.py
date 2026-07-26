@@ -164,7 +164,14 @@ def _suit_by_shape(crop: np.ndarray) -> str | None:
         defects = cv2.convexityDefects(contour, cv2.convexHull(contour, returnPoints=False))
     except cv2.error:
         return None
-    depth = 0 if defects is None else int((defects[:, 0, 3] / 256.0 > MIN_DEFECT_DEPTH).sum())
+    if defects is None:
+        depth = 0
+    else:
+        # OpenCV returns (N, 1, 4) on some builds and (N, 4) on others, so
+        # reshape rather than index a fixed rank. Column 3 is the defect depth
+        # in fixed-point 8.8 format, hence the 256.
+        rows = np.asarray(defects).reshape(-1, 4)
+        depth = int((rows[:, 3] / 256.0 > MIN_DEFECT_DEPTH).sum())
 
     if _is_red(crop):
         if depth == 0 and solidity > SOLIDITY_DIAMOND:
