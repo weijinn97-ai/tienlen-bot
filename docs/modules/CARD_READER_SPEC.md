@@ -156,18 +156,38 @@ corpus rather than a sample. It was 26.16% before thresholding and is now zero.
 
 | Metric | Value |
 |---|---|
-| Precision (37 transcribed hand cards) | **100.0%** (28 correct, 0 wrong) |
-| Recall | **75.7%** |
+| Precision (37 transcribed hand cards, in-sample) | **100.0%** (34 correct, 0 wrong) |
+| Recall (same set) | **91.9%** |
+| Frames with hand cards | 208 |
+| Cards read per frame | 8.0 |
 
-Label-free check, using the fact that the game displays a hand sorted by Tien Len
-strength — any hand returned out of order is provably wrong:
+**Out of sample.** Six hands never used to build a template — three captured live
+from a running emulator, three staged frames held out — transcribed left to right
+in display order, including unsorted hands, so a transposition would show as an
+error:
 
-| Metric | Value |
-|---|---|
-| Frames with hand cards | 192 |
-| **Hands returned out of sort order** | **1 (0.5%)** |
-| Frames with a duplicate hand card | 0 |
-| Cards read per frame | 5.5 |
+| Metric | Before the origin fix | After |
+|---|---|---|
+| Precision (75 hand cards) | 96.8% (1 wrong) | **100.0%** (0 wrong) |
+| Recall | 40.0% | **70.7%** |
+
+The in-sample figure overstates the reader by about 21 points of recall. Quote
+the out-of-sample column.
+
+#### The sort-order check has been withdrawn
+
+Earlier revisions of this document treated a hand returned in descending order as
+proof of a misread, on the premise that the game displays a hand sorted by Tien
+Len strength. That premise is false: the game sorts only after the player presses
+"Xep", and a freshly dealt hand is in deal order. Of 21 frames flagged by that
+check, three were opened and inspected — in all three the hand was unsorted and
+every card the reader returned was correct. The check produces false alarms at an
+unknown rate and is no longer reported.
+
+The duplicate-card check does not apply to this zone either: detections are keyed
+on `(code, zone)`, so a repeated code is dropped rather than reported, which costs
+recall but cannot surface as an error. Transcribed labels are currently the only
+sound correctness evidence for the hand.
 
 ### Suits are read by outline, not by bitmap
 
@@ -187,27 +207,62 @@ three lobes, a diamond is convex, a heart has one notch, a spade has a stem:
 | Spade | 0.874–0.973 | 0 or 2 |
 | Club | 0.811–0.893 | 3 or 4 |
 
-Colour already splits red from black, so only D-vs-H and S-vs-C remain, and the
-defect count decides both with no overlap: **37/37** against 30/37 for the
-bitmap. Solidity is retained as a guard so an unexpected outline is refused
-rather than forced into the nearest class.
+Colour already splits red from black, so only D-vs-H and S-vs-C remain. Those two
+questions are not equally settled, and the table above overstates the black one:
+it was built from 37 samples. An independent check on 156 labelled pips found
+**3 of 79 spades reaching 3 defects and 11 of 77 clubs falling below it**, so the
+black classes overlap and the "no overlap" claim previously made here was wrong.
+The ceiling for any single feature — solidity, defect count or defect depth — is
+about 95.5%, and the shipped rule scores 95.9% on the black pips it does not
+refuse. Closing that gap needs a second feature, not a re-tuned constant. Red is
+clean: diamonds sit at 0 defects 78/78 and hearts never cross over.
 
-This lifted hand recall from 32.4% to 75.7% at unchanged precision.
+Solidity is retained as a guard so an unexpected outline is refused rather than
+forced into the nearest class.
 
-The hand rank gate is tighter than the table's (0.17 vs 0.20). Deskewing leaves
-residual blur, and at 0.20 the labelled accuracy is identical but 9.5% of hands
-come back out of sort order; 0.17 drops that to 0.5% while costing no labelled
-accuracy at all.
+### The deskew origin, corrected
+
+Deskewing rotates a patch about the white bounding box's top-left. For a tilted
+card that point is not on the card, and the gap between it and the card's real
+corner moves with the fan angle — over 2058 hand cells the offset correlates
+**+0.86 in x and −0.96 in y** with the angle, spanning 47px of drift in x. The
+glyph windows are fixed pixel offsets, so they sampled a moving target and clipped
+the rank glyph.
+
+The reader now re-derives the origin after rotating: once the card is upright, its
+own component's bounding box starts at its corner. No fitted constant is involved.
+The card's component label travels with its box because a cropped patch can split
+a component, after which the bounding box no longer identifies it.
+
+Against the corrected origin the glyphs sit at x 14–61, y 7–76 (rank, sd 1.8 top
+and 1.2 bottom) and x 17–58, y 77–117 (pip), measured over 1329 cells; the windows
+were set from those spreads and the template bank rebuilt through the reader's own
+extraction path so template and runtime crops cannot drift apart.
+
+The hand rank gate stays at 0.17. Sweeping it from 0.20 down to 0.09 changes
+neither labelled accuracy nor cards read per frame by more than 0.2, so the gate
+is not what limits this zone.
 
 ### Gates not yet met
 
 `docs/TRAINING_PLAN_FINAL.md` requires precision/recall >= 0.98 and exact combo
->= 97% for the table. Precision is met; **recall at 80.4% is not**, and exact-set
-accuracy is unmeasured. This reader is not qualified for production play.
+>= 97% for the table. Precision is met; **recall is not** — 70.7% for the hand
+out of sample, 80.4% for the table in sample — and exact-set accuracy is
+unmeasured. This reader is not qualified for production play.
 
-The 51-card labelled set is also small and was used to pick thresholds, so the
-precision figure is in-sample. An owner-locked evaluation set is still required
-before any production claim.
+The labelled sets remain small. The 75-card out-of-sample set is the only figure
+here that was not measured on the frames used to build or tune the reader, and it
+was transcribed by the same agent that wrote the reader. An owner-locked
+evaluation set is still required before any production claim.
+
+Two limits are known and unaddressed:
+
+- The table zone missed the played card on a live frame whose card sits beside the
+  top player's avatar rather than in the middle of the table. The box was found;
+  the rank match was refused at 0.376 against a 0.20 gate. Table templates appear
+  not to cover that presentation.
+- Spade-versus-club overlaps as described above, so about 4% of black pips the
+  reader accepts are a coin flip between the two.
 
 ## 7. Test requirements
 
