@@ -1,0 +1,6 @@
+py -3 -m unittest discover -s tests -p "test_perception_pipeline.py" -v
+py -3 -m unittest discover -s tests -q
+py -3 -m compileall -q bot contracts tools
+py -3 tools/check_module_governance.py
+powershell -ExecutionPolicy Bypass -File gemini_handoff_bundle/guard_scope.ps1
+git diff --check

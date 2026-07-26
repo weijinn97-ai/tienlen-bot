@@ -1,0 +1,21 @@
+{
+  "status": "CANDIDATE",
+  "task_id": "M2.3-PERCEPTION-PIPELINE-01",
+  "focused_tests": 17,
+  "full_tests": 325,
+  "compile": "pass",
+  "governance": "pass",
+  "scope_guard": "pass",
+  "diff_check": "pass",
+  "acceptance_scenario_coverage": {
+    "happy_path": "covered",
+    "bot_frame_mismatch": "covered",
+    "malformed_adapter_output": "covered",
+    "adapter_exception": "covered",
+    "conflicting_turn_signals": "covered",
+    "deterministic_ordering": "covered",
+    "no_input_mutation": "covered"
+  },
+  "production_qualification": "BLOCKED",
+  "training_authorized": false
+}
