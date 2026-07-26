@@ -140,41 +140,45 @@ class TurnLoop:
     def _with_turn_owner(
         self, snapshot: PerceptionSnapshot, image: np.ndarray
     ) -> PerceptionSnapshot:
-        """Attach turn ownership, confirming our own turn with a second signal.
+        """Attach turn ownership. The action buttons decide; the ring may veto.
 
-        The repository's hybrid detector confirms the avatar highlight against a
-        card-count delta, which needs the opponents' counts read from the screen -
-        the bot does not read them yet. The action buttons are a better witness
-        and are already detected: measured over 221 frames, an action button is
-        visible on 111 and the gold ring picks SELF on 107 of those, while on the
-        110 frames with no button the ring picks another seat 94 times and SELF
-        only 4. Requiring both removes those 4.
+        The game shows "Đánh" or "Bỏ Lượt" only on the player's own turn, which
+        makes them the strongest signal available. The gold avatar ring is a
+        second witness, but it is not reliable enough to be required: measured
+        over 582 frames an action button is visible on 165, and on 57 of those
+        the ring is undecided. Requiring the ring would forfeit 35% of the bot's
+        turns, and a forfeited turn is auto-played - the exact failure this loop
+        exists to prevent.
 
-        A ring on another seat is reported as-is; it never triggers an action, so
-        a second witness would buy nothing.
+        So the ring only vetoes, and only when it positively names another seat.
+        That case occurred once in 582 frames; the veto costs one frame and
+        guards against acting on a stale or transitional button.
+
+        A ring on SELF with no action button is not our turn: that happens on 5
+        frames, all without buttons, and acting there would act off-turn.
         """
         detection = self.highlight.detect(image)
-        owner = detection.owner
-        if owner is SeatPosition.SELF and not any(
+        actionable = any(
             button.is_visible and button.button_id in ACTION_BUTTONS
             for button in snapshot.buttons
-        ):
-            owner = None
+        )
+        if actionable and detection.owner is not SeatPosition.SELF and detection.owner is not None:
+            owner = detection.owner
+        elif actionable:
+            owner = SeatPosition.SELF
+        else:
+            owner = detection.owner if detection.owner is not SeatPosition.SELF else None
 
         evidence = None
         if owner is not None and detection.roi is not None:
-            actionable = [
-                button.button_id.value
-                for button in snapshot.buttons
-                if button.is_visible and button.button_id in ACTION_BUTTONS
-            ]
+            ring = detection.owner.name if detection.owner is not None else "none"
             evidence = TurnOwnerEvidence(
                 primary_signal=TurnPrimarySignal.AVATAR_HIGHLIGHT,
                 primary_roi=detection.roi,
                 primary_confidence=detection.confidence,
                 secondary_confidence=1.0 if actionable else 0.0,
-                signals_agree=owner is not SeatPosition.SELF or bool(actionable),
-                notes=f"ring={owner.name};buttons={','.join(actionable) or 'none'}",
+                signals_agree=detection.owner is owner,
+                notes=f"ring={ring};buttons={'yes' if actionable else 'no'}",
             )
         # Confidence is left as the pipeline computed it: the turn signals are a
         # gate on acting, not evidence about how well the cards were read.
