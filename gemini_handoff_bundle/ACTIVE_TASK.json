@@ -1,20 +1,21 @@
 {
   "schema_version": 1,
   "agent": "Google Gemini",
-  "task_id": "M2.3-PERCEPTION-PIPELINE-01",
+  "task_id": "M2.4-CARD-READER-01",
   "issue": 14,
-  "instruction_file": "gemini_handoff_bundle/tasks/M2_3_PERCEPTION_PIPELINE_01.md",
+  "instruction_file": "docs/modules/CARD_READER_SPEC.md",
   "baseline_ref": "m2-3-perception-baseline",
-  "required_branch": "agent/m2-3-perception-pipeline",
+  "required_branch": "agent/m2-4-card-reader",
   "checkout_directory": "tienlen-bot-m2-3",
-  "output_directory": "M2_3_PERCEPTION_PIPELINE_OUTPUT",
+  "output_directory": "M2_4_CARD_READER_OUTPUT",
   "status": "ACTIVE",
   "policy": "deny_by_default",
   "allowed_new_paths": [
-    "bot/perception/pipeline.py",
-    "tests/test_perception_pipeline.py",
-    "docs/acceptance/perception/0.1.0/**",
-    "M2_3_PERCEPTION_PIPELINE_OUTPUT/**"
+    "bot/perception/card_reader.py",
+    "bot/perception/card_templates.npz",
+    "tests/test_card_reader.py",
+    "docs/modules/**",
+    "tools/bench_card_reader_latency.py"
   ],
   "allowed_existing_file_modifications": [
     "bot/perception/__init__.py"

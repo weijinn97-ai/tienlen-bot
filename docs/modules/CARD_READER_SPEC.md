@@ -1,6 +1,6 @@
 # Card Reader Module — Interface Specification
 
-Status: `DRAFT — pending owner approval`
+Status: `IMPLEMENTED — table zone only`
 Owner-authorised: CUDA torch install, GTX 1650 reference device, per-machine device selection.
 
 This document is the contract other agents work against. It defines the module
@@ -16,6 +16,11 @@ pixels.
 ## 2. Module boundary
 
 Path: `bot/perception/card_reader.py`
+
+**Scope: `CardZone.TABLE` only.** Hand cards are drawn larger and rotated into a
+fan; flat templates do not transfer. Measured duplicate rate is 30.9% in the hand
+zone against 3.0% on the table, so the reader deliberately refuses to look there.
+Reading the hand needs deskewing and its own template bank.
 
 The module plugs into the existing `PerceptionPipeline` as its card adapter. The
 pipeline already defines the required shape:
@@ -105,18 +110,55 @@ is excluded from steady-state percentiles but MUST be reported, because the firs
 inference after process start is materially slower and would otherwise hide a
 cold-start stall.
 
-## 6. Accuracy thresholds
+## 6. Accuracy
 
-Inherited from `docs/TRAINING_PLAN_FINAL.md`. These are acceptance gates, not
-current status:
+### Implementation
 
-| Zone | Precision / Recall | Exact-set |
-|---|---|---|
-| `MY_HAND` | >= 0.99 | exact hand >= 98% |
-| `TABLE` | >= 0.98 | exact combo >= 97% |
+`bot/perception/card_reader.py` matches the corner index against a template bank
+of 13 rank and 4 suit glyphs shipped as `card_templates.npz` (6 KB). The game
+renders cards as fixed sprites, so a template built from real examples matches
+later occurrences exactly. There is no model and no training.
 
-No accuracy claim may be published without an owner-locked evaluation set. The
-current dataset has **0 annotated images**, so no accuracy figure exists yet.
+Templates are built differently per glyph type, for a measured reason:
+
+- **Ranks: medoid.** Averaging several examples blurred the glyphs badly - the
+  `9` template was 47.5% ambiguous pixels and was consistently misread as `Q`.
+  Taking the single most representative example dropped that to 12.1%.
+- **Suits: mean.** Suit glyphs vary more within a class (hearts spread 0.156
+  against ~0.09 elsewhere), so a single example rejected correct reads.
+
+Suits are decided by colour first, which removes red/black confusion entirely
+(51/51 correct on the labelled set), then by margin between the two remaining
+candidates rather than absolute distance.
+
+### Measured, on 51 hand-transcribed table cards
+
+| Metric | Value |
+|---|---|
+| Precision | **100.0%** (41 correct, 0 wrong) |
+| Recall | 80.4% (10 refused) |
+
+### Label-free check over all 221 staged frames
+
+| Metric | Value |
+|---|---|
+| Frames with table cards | 110 |
+| Cards read | 427 |
+| **Frames containing a duplicate card** | **0 (0.0%)** |
+
+A frame that reports the same physical card twice is provably wrong without
+needing ground truth, so this is an error lower bound measured on the whole
+corpus rather than a sample. It was 26.16% before thresholding and is now zero.
+
+### Gates not yet met
+
+`docs/TRAINING_PLAN_FINAL.md` requires precision/recall >= 0.98 and exact combo
+>= 97% for the table. Precision is met; **recall at 80.4% is not**, and exact-set
+accuracy is unmeasured. This reader is not qualified for production play.
+
+The 51-card labelled set is also small and was used to pick thresholds, so the
+precision figure is in-sample. An owner-locked evaluation set is still required
+before any production claim.
 
 ## 7. Test requirements
 

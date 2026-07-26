@@ -1,0 +1,22 @@
+{
+  "labelled": {
+    "total": 51,
+    "correct": 41,
+    "wrong": 0,
+    "dropped": 10,
+    "precision": 1.0,
+    "recall": 0.8039
+  },
+  "corpus": {
+    "frames_scanned": 221,
+    "frames_with_table_cards": 110,
+    "cards_read": 427,
+    "frames_with_duplicate": 0,
+    "duplicate_cards": 0
+  },
+  "latency_ms": {
+    "p50": 5.1,
+    "p95": 7.8
+  },
+  "zone": "table_only"
+}
