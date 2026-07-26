@@ -108,7 +108,7 @@ button was gone on the next frame — the turn was taken back.
 | Complete tap plans built and executed against a recording controller | 62 |
 | Taps per plan | 1.97 mean, 5 max |
 | **Plans naming a card the hand does not hold** | **0** |
-| Latency p50 / p95 | 50.7 ms / 68.9 ms (0.57% of the 12 s turn budget) |
+| Latency p50 / p95 | 50.7 ms / 68.9 ms (0.53% of the 13 s turn budget) |
 
 Where frames stop:
 
@@ -122,7 +122,17 @@ Where frames stop:
 | `unplannable` | 8 |
 | `respond_single` / `respond_straight` / `respond_four_of_a_kind` (acted) | 13 |
 
-## 6. Running it against a live emulator
+## 6. The clock
+
+Each turn has a **13-second** countdown. Miss it and the game plays a legal move
+for the player; miss it twice and it takes over entirely and shows "Hủy tự động".
+
+The loop costs about 50ms, so the poll interval is what decides how much of those
+13 seconds is left. It defaults to **0.3s**, and the runner skips its sleep
+entirely on a turn it is acting on, so a retry lands inside the same countdown
+rather than the next one.
+
+## 7. Running it against a live emulator
 
 ```
 py -3 tools/run_turn_loop.py --serial 127.0.0.1:23523            # dry run
@@ -142,7 +152,7 @@ Capture is `adb exec-out screencap`, which the architecture rules bar from the
 production hot path. This is an operator tool; the runtime capture path stays
 Windows-side and HWND-bound.
 
-## 7. Known limits
+## 8. Known limits
 
 - **`invalid_target_combo`, 41 frames.** The table cards that were read do not
   form a legal Tien Len combo, so the bot cannot judge what it must beat and
@@ -157,5 +167,15 @@ Windows-side and HWND-bound.
 - **Confidence excludes the turn signals.** The gate decides whether to act; it
   is not evidence about how well the cards were read, so it is deliberately not
   folded into `snapshot.confidence`.
+- **The decision layer plays the weakest legal move.** `LocalAgent` takes
+  `enumerate_legal_moves(...)[0]`, which for a lead is the lowest single. Observed
+  live: holding four 4s it led a single 4♠, breaking up the quad. That is a
+  strategy gap, not a correctness one - every move it makes is legal and uses
+  cards it holds - but it will cost games. Nothing in this loop constrains it.
+- **A selected card is skipped, not verified.** `ActionTapExecutor` now leaves an
+  already-lifted card alone, which stops the deselect loop, but it does not check
+  that the selection matches the plan. A card selected by something else - a
+  stray tap, a previous failed turn - would be played along with the intended
+  ones.
 - **No consensus across frames.** `HybridTurnOwnerConsensus` and
   `TableStateConsensus` exist and are not used here. One frame, one decision.
