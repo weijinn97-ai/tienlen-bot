@@ -19,9 +19,18 @@ what decides how much of those 13 seconds is left to act in - it defaults to
 0.3s, and the sleep is skipped entirely on a turn we are acting on, so a retry
 lands inside the same countdown instead of the next one.
 
-Capture here is `adb exec-out screencap`, which the architecture rules bar from
-the production hot path. This is an operator and development tool; the runtime
-capture path stays Windows-side and HWND-bound.
+Pass --hwnd to capture the emulator window instead of asking the device for a
+PNG: 33ms against 135ms, and the perception stack reads the two identically. The
+window may sit behind every other window on the desktop - occlusion was measured
+and does not affect it - but it must not be minimised, because a minimised window
+has no client area to redraw, and it must not be pushed entirely off the desktop,
+because then it stops redrawing and the capture freezes. A minimised window is
+restored without taking focus; pass --no-restore-window to leave it alone and use
+ADB instead.
+
+The ADB fallback uses `adb exec-out screencap`, which the architecture rules bar
+from the production hot path. This is an operator and development tool; the
+runtime capture path stays Windows-side and HWND-bound.
 """
 from __future__ import annotations
 
@@ -73,9 +82,17 @@ class Screen:
     the emulator and this quietly drops back to ADB, four times slower.
     """
 
-    def __init__(self, adb_path: str, serial: str, hwnd: int | None = None) -> None:
+    def __init__(
+        self,
+        adb_path: str,
+        serial: str,
+        hwnd: int | None = None,
+        *,
+        restore_window: bool = True,
+    ) -> None:
         self.adb_path = adb_path
         self.serial = serial
+        self.restore_window = restore_window
         self.window: WindowsCapture | None = None
         self.viewport: tuple[int, int, int, int] | None = None
         if hwnd is not None:
@@ -85,6 +102,9 @@ class Screen:
         """Find where the game sits inside the window, using one device frame."""
         try:
             capture = WindowsCapture(hwnd=hwnd)
+            if self.restore_window and capture.is_minimised():
+                capture.restore_without_focus()
+                time.sleep(0.5)
             window = capture.capture_window()
         except Exception as exc:
             log(f"khong dung duoc duong chup cua so ({exc}); quay ve ADB", "WARN")
@@ -127,6 +147,12 @@ class Screen:
     def grab(self) -> np.ndarray | None:
         if self.window is not None and self.viewport is not None:
             try:
+                if self.restore_window and self.window.is_minimised():
+                    if self.window.restore_without_focus():
+                        log("cua so bi thu nho -> da khoi phuc (khong doat focus)", "WARN")
+                    else:
+                        log("cua so bi thu nho, khoi phuc that bai; dung ADB", "WARN")
+                        return self.grab_device()
                 raw = self.window.capture_window()
                 x, y, width, height = self.viewport
                 cropped = raw[y : y + height, x : x + width]
@@ -161,12 +187,19 @@ def main() -> int:
         help="cua so giả lập, de chup nhanh gap 4 lan; bo qua thi dung ADB",
     )
     parser.add_argument(
+        "--no-restore-window", action="store_true",
+        help="de nguyen cua so bi thu nho va dung ADB, thay vi khoi phuc no",
+    )
+    parser.add_argument(
         "--act", action="store_true",
         help="thuc su bam nut va danh bai; mac dinh chi in ra quyet dinh",
     )
     args = parser.parse_args()
 
-    screen = Screen(args.adb_path, args.serial, args.hwnd)
+    screen = Screen(
+        args.adb_path, args.serial, args.hwnd,
+        restore_window=not args.no_restore_window,
+    )
     loop = TurnLoop(
         PerceptionPipeline(
             PerceptionAdapters(

@@ -21,6 +21,11 @@ try:
 except ImportError:  # pragma: no cover - depends on the Windows runtime environment
     win32ui = None
 
+try:
+    import win32con
+except ImportError:  # pragma: no cover - depends on the Windows runtime environment
+    win32con = None
+
 from bot.runtime.schemas import CaptureSource
 
 # PrintWindow's PW_RENDERFULLCONTENT. The emulator composites through the GPU,
@@ -145,7 +150,9 @@ class WindowsCapture:
         left, top, right, bottom = win32gui.GetClientRect(self.hwnd)
         width, height = right - left, bottom - top
         if width <= 0 or height <= 0:
-            raise RuntimeError("Window has invalid dimensions for capture.")
+            raise RuntimeError(
+                "Window has no client area to capture; it is probably minimised."
+            )
 
         window_dc = win32gui.GetWindowDC(self.hwnd)
         mfc_dc = win32ui.CreateDCFromHandle(window_dc)
@@ -167,6 +174,32 @@ class WindowsCapture:
             mfc_dc.DeleteDC()
             win32gui.ReleaseDC(self.hwnd, window_dc)
         return frame
+
+    def is_minimised(self) -> bool:
+        if win32gui is None:
+            return False
+        left, top, right, bottom = win32gui.GetClientRect(self.hwnd)
+        return right - left <= 0 or bottom - top <= 0
+
+    def restore_without_focus(self) -> bool:
+        """Bring a minimised window back without taking the user's focus.
+
+        Measured on this emulator: a minimised window has no client area and
+        cannot be captured at all, but a restored one can be captured even when
+        it is completely covered by other windows - occluded, the capture still
+        tracked a screen change of 37.4/255 that the device also saw, and matched
+        the device frame to 0.53/255 afterwards. So restoring is enough; the
+        window does not have to be visible, and it need not steal focus.
+
+        A window pushed entirely off the desktop is a different matter: it stops
+        redrawing, and the capture freezes on whatever it showed last.
+        """
+        if win32gui is None or win32con is None:
+            return False
+        if not self.is_minimised():
+            return True
+        win32gui.ShowWindow(self.hwnd, win32con.SW_SHOWNOACTIVATE)
+        return not self.is_minimised()
 
     def capture_frame(self) -> np.ndarray:
         rect = self.get_window_rect()
