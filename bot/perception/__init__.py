@@ -23,6 +23,7 @@ from bot.perception.buttons import (
     TemplateButtonDetector,
     load_gameplay_button_detector,
 )
+from bot.perception.card_reader import CardReader, CardReaderError
 from bot.perception.yolo_cards import YoloCardConfigurationError, YoloCardDetector
 from bot.perception.ocr import OcrConfigurationError, OcrText, TesseractOcr
 from bot.perception.fan_cards import FanCardTemplateRecognizer, FanGeometry
@@ -70,6 +71,8 @@ from bot.perception.ui_inference_runner import (
 )
 
 __all__ = [
+    "CardReader",
+    "CardReaderError",
     "DEFAULT_AVATAR_LAYOUT",
     "AvatarRoiLayout",
     "ButtonTemplate",
