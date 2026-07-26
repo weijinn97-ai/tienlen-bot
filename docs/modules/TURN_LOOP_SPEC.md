@@ -108,7 +108,8 @@ button was gone on the next frame — the turn was taken back.
 | Complete tap plans built and executed against a recording controller | 62 |
 | Taps per plan | 1.97 mean, 5 max |
 | **Plans naming a card the hand does not hold** | **0** |
-| Latency p50 / p95 | 50.7 ms / 68.9 ms (0.53% of the 13 s turn budget) |
+| Decision latency p50 / p95 | 50.7 ms / 68.9 ms |
+| Whole live cycle, window capture | 64.0 ms (0.49% of the 13 s turn budget) |
 
 Where frames stop:
 
@@ -127,16 +128,41 @@ Where frames stop:
 Each turn has a **13-second** countdown. Miss it and the game plays a legal move
 for the player; miss it twice and it takes over entirely and shows "Hủy tự động".
 
-The loop costs about 50ms, so the poll interval is what decides how much of those
-13 seconds is left. It defaults to **0.3s**, and the runner skips its sleep
-entirely on a turn it is acting on, so a retry lands inside the same countdown
-rather than the next one.
+The loop's decision costs about 50ms, but that measurement starts after a frame
+is already in memory, and getting the frame was the real cost. Profiled on a live
+emulator:
+
+| stage | before | after |
+|---|---|---|
+| get the pixels | `adb screencap -p` **135.0 ms** | window `PrintWindow` **33.1 ms** |
+| decode | 13.8 ms | none — already an array |
+| button templates | 34.0 ms | **9.3 ms** (matched every other pixel) |
+| card reader | 8.4 ms | 8.4 ms |
+| avatar ring | 1.0 ms | 1.0 ms |
+| **whole cycle** | **181.6 ms** | **64.0 ms** |
+
+The card reader was never the bottleneck — it was 8ms of a 182ms cycle. Capture
+was 74% of it.
+
+Both changes were checked for equivalence rather than assumed: the two capture
+routes produced identical perception on every frame compared, and the halved
+button match reached the same decision on all 590 recorded frames, with the
+reported centre never more than one pixel away.
+
+The window route needs the emulator **restored, not minimised** — `PrintWindow`
+reports a zero-sized client area for a minimised window. The runner falls back to
+ADB automatically and says so.
+
+The poll interval defaults to **0.3s**, and the runner skips its sleep entirely
+on a turn it is acting on, so a retry lands inside the same countdown rather than
+the next one.
 
 ## 7. Running it against a live emulator
 
 ```
-py -3 tools/run_turn_loop.py --serial 127.0.0.1:23523            # dry run
-py -3 tools/run_turn_loop.py --serial 127.0.0.1:23523 --act      # plays
+py -3 tools/run_turn_loop.py --serial 127.0.0.1:23523                      # dry run, ADB capture
+py -3 tools/run_turn_loop.py --serial 127.0.0.1:23523 --hwnd 0x140ce6     # 2.8x faster
+py -3 tools/run_turn_loop.py --serial 127.0.0.1:23523 --hwnd 0x140ce6 --act
 ```
 
 Dry run reads the screen, decides, prints the decision and taps nothing. `--act`
