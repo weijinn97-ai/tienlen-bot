@@ -155,3 +155,36 @@ class TurnLoopTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SelectedCardExecutionTests(unittest.TestCase):
+    """A card already selected must not be tapped again."""
+
+    class Recorder:
+        def __init__(self) -> None:
+            self.taps: list[tuple[int, int]] = []
+
+        def tap(self, x: int, y: int, *, timeout: int = 10) -> str:
+            self.taps.append((x, y))
+            return "ok"
+
+    def test_an_already_selected_card_is_not_re_tapped(self) -> None:
+        """Tapping is a toggle. Re-tapping a selected card deselects it, and the
+        turn loops until the clock runs out - observed live, twelve times on the
+        same card."""
+        from bot.actions.action_pipeline import ActionTapExecutor
+        from contracts.interfaces import ActionPlan, PerceptionSnapshot
+
+        snapshot = PerceptionSnapshot(
+            bot_id="bot-1", frame_id="f1", frame_ts=1, confidence=0.9,
+            cards=(
+                DetectedCard("5S", Rect(10, 460, 20, 40), CardZone.SELECTED, 0.9),
+                DetectedCard("6S", Rect(40, 520, 20, 40), CardZone.MY_HAND, 0.9),
+            ),
+            buttons=(play_button(),),
+        )
+        plan = ActionPlan(kind=ActionKind.PLAY, cards=("5S", "6S"), target_button=ButtonId.PLAY)
+        recorder = self.Recorder()
+        taps = ActionTapExecutor(recorder, sleep=lambda _s: None).execute(plan, snapshot)
+        # 6S is tapped to select it, 5S is skipped, then the action button.
+        self.assertEqual([t.target for t in taps], ["6S", str(ButtonId.PLAY)])

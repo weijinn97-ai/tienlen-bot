@@ -390,3 +390,24 @@ class SuitByShapeTests(unittest.TestCase):
         crop = self._blank()
         cv2.circle(crop, (30, 30), 2, BLACK_INK, -1)
         self.assertIsNone(_suit_by_shape(crop))
+
+
+class SelectedCardTests(unittest.TestCase):
+    """Tapping a hand card lifts it clear of the fan; that lift means selected."""
+
+    def setUp(self) -> None:
+        self.reader = CardReader()
+
+    def test_a_card_lifted_above_its_neighbours_reads_as_selected(self) -> None:
+        boxes = [((100, 540, 80, 200), 1), ((180, 460, 80, 220), 2), ((260, 535, 80, 200), 3)]
+        self.assertEqual(self.reader._lifted(boxes), [False, True, False])
+
+    def test_the_fans_own_curve_is_not_a_selection(self) -> None:
+        """Adjacent cards in a real fan differ by at most 9px, well under the
+        25px lift, so the whole arc must read as unselected."""
+        tops = [540, 531, 524, 518, 514, 511, 510, 510, 510, 513, 517, 522, 530]
+        boxes = [((100 + 70 * i, top, 80, 200), i + 1) for i, top in enumerate(tops)]
+        self.assertEqual(self.reader._lifted(boxes), [False] * len(tops))
+
+    def test_a_single_card_is_never_selected(self) -> None:
+        self.assertEqual(self.reader._lifted([((100, 400, 80, 200), 1)]), [False])

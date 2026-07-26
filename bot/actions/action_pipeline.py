@@ -122,6 +122,11 @@ class ActionTapExecutor:
             for code in plan.cards:
                 if code not in detections:
                     raise ValueError(f"Card ROI disappeared before action: {code}")
+                # Tapping is a toggle. A card already lifted out of the fan is
+                # selected, so tapping it again would deselect it and the turn
+                # would loop until the clock ran out.
+                if detections[code].zone is CardZone.SELECTED:
+                    continue
                 x, y = rect_center(detections[code].roi)
                 self.controller.tap(x, y)
                 taps.append(ExecutedTap(code, x, y))
