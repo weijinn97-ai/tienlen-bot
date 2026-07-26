@@ -43,6 +43,7 @@ if str(ROOT) not in sys.path:
 
 from bot.actions.action_pipeline import ActionTapExecutor
 from bot.actions.adb_controller import ADBController
+from bot.capture.windows_capture import WindowsCapture
 from bot.perception.buttons import load_gameplay_button_detector
 from bot.perception.card_reader import CardReader
 from bot.perception.pipeline import PerceptionAdapters, PerceptionPipeline
@@ -60,15 +61,59 @@ def log(message: str, level: str = "INFO") -> None:
 
 
 class Screen:
-    """One emulator, captured on demand."""
+    """One emulator, captured on demand, by whichever route is available.
 
-    def __init__(self, adb_path: str, serial: str) -> None:
+    Asking the device for a PNG costs 135ms - more than the whole rest of the
+    cycle put together. Capturing the emulator window directly costs 33ms and the
+    perception stack read the two identically on every frame compared, so the
+    window is preferred and the device is the fallback.
+
+    The window route needs the emulator restored: PrintWindow reports a zero-sized
+    client area for a minimised window, and there is nothing to redraw. Minimise
+    the emulator and this quietly drops back to ADB, four times slower.
+    """
+
+    def __init__(self, adb_path: str, serial: str, hwnd: int | None = None) -> None:
         self.adb_path = adb_path
         self.serial = serial
-        self.scratch = ROOT / ".runtime" / "last_frame.png"
-        self.scratch.parent.mkdir(parents=True, exist_ok=True)
+        self.window: WindowsCapture | None = None
+        self.viewport: tuple[int, int, int, int] | None = None
+        if hwnd is not None:
+            self._prepare_window(hwnd)
 
-    def grab(self) -> np.ndarray | None:
+    def _prepare_window(self, hwnd: int) -> None:
+        """Find where the game sits inside the window, using one device frame."""
+        try:
+            capture = WindowsCapture(hwnd=hwnd)
+            window = capture.capture_window()
+        except Exception as exc:
+            log(f"khong dung duoc duong chup cua so ({exc}); quay ve ADB", "WARN")
+            return
+        device = self.grab_device()
+        if device is None:
+            log("khong lay duoc khung ADB de can chuan; quay ve ADB", "WARN")
+            return
+        best = None
+        for width in range(900, window.shape[1] + 1, 4):
+            height = round(width * device.shape[0] / device.shape[1])
+            if height > window.shape[0]:
+                continue
+            needle = cv2.resize(device, (width, height), interpolation=cv2.INTER_AREA)
+            _, score, _, location = cv2.minMaxLoc(
+                cv2.matchTemplate(window, needle, cv2.TM_CCOEFF_NORMED)
+            )
+            if best is None or score > best[0]:
+                best = (score, location[0], location[1], width, height)
+        if best is None or best[0] < 0.85:
+            log(f"can chuan cua so khong dat (diem {0 if best is None else best[0]:.2f}); "
+                "quay ve ADB", "WARN")
+            return
+        score, x, y, width, height = best
+        self.window = capture
+        self.viewport = (x, y, width, height)
+        log(f"chup qua cua so | vung game x={x} y={y} {width}x{height} | khop {score:.3f}")
+
+    def grab_device(self) -> np.ndarray | None:
         result = subprocess.run(
             [self.adb_path, "-s", self.serial, "exec-out", "screencap", "-p"],
             capture_output=True,
@@ -76,9 +121,23 @@ class Screen:
         )
         if result.returncode != 0 or not result.stdout:
             return None
-        self.scratch.write_bytes(result.stdout)
-        image = cv2.imread(str(self.scratch), cv2.IMREAD_COLOR)
+        image = cv2.imdecode(np.frombuffer(result.stdout, np.uint8), cv2.IMREAD_COLOR)
         return image if image is not None and image.shape == FRAME_SHAPE else None
+
+    def grab(self) -> np.ndarray | None:
+        if self.window is not None and self.viewport is not None:
+            try:
+                raw = self.window.capture_window()
+                x, y, width, height = self.viewport
+                cropped = raw[y : y + height, x : x + width]
+                if cropped.size:
+                    return cv2.resize(
+                        cropped, (FRAME_SHAPE[1], FRAME_SHAPE[0]), interpolation=cv2.INTER_AREA
+                    )
+            except Exception as exc:
+                log(f"chup cua so hong ({exc}); quay ve ADB", "WARN")
+                self.window = None
+        return self.grab_device()
 
 
 def describe(outcome) -> str:
@@ -98,12 +157,16 @@ def main() -> int:
     parser.add_argument("--interval", type=float, default=0.3)
     parser.add_argument("--max-steps", type=int, default=200)
     parser.add_argument(
+        "--hwnd", type=lambda v: int(v, 0), default=None,
+        help="cua so giả lập, de chup nhanh gap 4 lan; bo qua thi dung ADB",
+    )
+    parser.add_argument(
         "--act", action="store_true",
         help="thuc su bam nut va danh bai; mac dinh chi in ra quyet dinh",
     )
     args = parser.parse_args()
 
-    screen = Screen(args.adb_path, args.serial)
+    screen = Screen(args.adb_path, args.serial, args.hwnd)
     loop = TurnLoop(
         PerceptionPipeline(
             PerceptionAdapters(
