@@ -101,7 +101,9 @@ class Screen:
         self.restore_window = restore_window
         self.window: WindowsCapture | None = None
         self.viewport: tuple[int, int, int, int] | None = None
-        self.previous: np.ndarray | None = None
+        # The frame the current decision was made on. Tap confirmation compares
+        # against this, so it must be set before any tap is sent.
+        self.reference: np.ndarray | None = None
         if hwnd is not None:
             self._prepare_window(hwnd)
 
@@ -198,6 +200,10 @@ def main() -> int:
         help="de nguyen cua so bi thu nho va dung ADB, thay vi khoi phuc no",
     )
     parser.add_argument(
+        "--dump-repeats", default=None,
+        help="thu muc luu khung khi cung mot quyet dinh lap lai, de tim nguyen nhan",
+    )
+    parser.add_argument(
         "--act", action="store_true",
         help="thuc su bam nut va danh bai; mac dinh chi in ra quyet dinh",
     )
@@ -227,15 +233,21 @@ def main() -> int:
         best caught 3 of 19. What is reliable is the change the tap itself makes.
         Over 22 taps we made deliberately, the tapped card's own region changed
         by at least 19.8% of its pixels, while an untouched region changed none.
+
+        The comparison is against the frame the decision was made on, which was
+        taken before any tap. Comparing against a frame grabbed inside this
+        function instead would compare two post-tap frames, find them identical,
+        and report every tap as failed - which taps the card a second time and
+        deselects it. That is exactly the loop this check exists to prevent, and
+        it is what the first version of it did.
         """
+        reference = screen.reference
+        if reference is None:
+            return True
         image = screen.grab()
         if image is None:
             return True  # cannot tell; assume it landed rather than tap twice
-        previous = screen.previous
-        screen.previous = image
-        if previous is None:
-            return True
-        patch_a = previous[roi.y : roi.y + roi.height, roi.x : roi.x + roi.width]
+        patch_a = reference[roi.y : roi.y + roi.height, roi.x : roi.x + roi.width]
         patch_b = image[roi.y : roi.y + roi.height, roi.x : roi.x + roi.width]
         if patch_a.shape != patch_b.shape or patch_a.size == 0:
             return True
@@ -260,6 +272,7 @@ def main() -> int:
     )
 
     acted = cancelled = read_failures = rounds = 0
+    last_signature, repeats = None, 0
     last_signature = None
     for step in range(args.max_steps):
         if stop.is_set():
@@ -320,6 +333,19 @@ def main() -> int:
         cards = outcome.decision.get("cards", [])
         log(f"luot ta ({elapsed:.0f}ms) {describe(outcome)} -> {action} {cards} [{reason}]")
 
+        # A decision that keeps coming back means the previous attempt did not
+        # take. Keeping the frame is the only way to find out why, because the
+        # log records what the reader believed, not what was on screen.
+        signature = (action, tuple(cards), describe(outcome))
+        repeats = repeats + 1 if signature == last_signature else 0
+        last_signature = signature
+        if args.dump_repeats and repeats in (2, 5, 10):
+            directory = Path(args.dump_repeats)
+            directory.mkdir(parents=True, exist_ok=True)
+            path = directory / f"repeat{repeats:02d}_step{step:03d}.png"
+            cv2.imwrite(str(path), image)
+            log(f"   lap lai {repeats} lan -> da luu {path.name}", "WARN")
+
         if outcome.plan is None or outcome.plan.kind is ActionKind.WAIT:
             time.sleep(args.interval)
             continue
@@ -335,6 +361,7 @@ def main() -> int:
         signature = (tuple(outcome.plan.cards), describe(outcome))
         repeated = signature == last_signature
         last_signature = signature
+        screen.reference = image
         try:
             taps = executor.execute(
                 outcome.plan, outcome.snapshot, skip_selection=repeated
