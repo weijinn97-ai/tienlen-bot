@@ -41,7 +41,7 @@ from bot.perception.card_reader import CardReader
 from bot.perception.pipeline import PerceptionAdapters, PerceptionPipeline
 from bot.runtime.schemas import CaptureSource, FrameEnvelope
 from bot.runtime.turn_loop import TurnLoop
-from contracts.interfaces import ActionKind, CardZone
+from contracts.interfaces import ActionKind, ButtonId, CardZone
 
 BUTTON_TEMPLATES = ROOT / "data" / "templates" / "buttons" / "1280x720"
 FRAME_SHAPE = (720, 1280, 3)
@@ -124,7 +124,7 @@ def main() -> int:
         f"| nhip={args.interval}s | toi_da={args.max_steps} buoc"
     )
 
-    acted = cancelled = read_failures = 0
+    acted = cancelled = read_failures = rounds = 0
     for step in range(args.max_steps):
         if stop.is_set():
             break
@@ -155,6 +155,26 @@ def main() -> int:
             time.sleep(args.interval)
             continue
 
+        ready = next(
+            (
+                button
+                for button in (outcome.snapshot.buttons if outcome.snapshot else ())
+                if button.button_id is ButtonId.READY and button.is_visible
+            ),
+            None,
+        )
+        if ready is not None:
+            x = ready.roi.x + ready.roi.width // 2
+            y = ready.roi.y + ready.roi.height // 2
+            if args.act:
+                log(f"het van -> bam Tiep Tuc tai ({x},{y})")
+                controller.tap(x, y)
+                rounds += 1
+            else:
+                log(f"het van, thay Tiep Tuc tai ({x},{y}) (chay thu: de nguyen)")
+            time.sleep(args.interval)
+            continue
+
         if not outcome.is_my_turn:
             time.sleep(args.interval)
             continue
@@ -182,7 +202,7 @@ def main() -> int:
 
     log(
         f"Ket thuc | da danh={acted} | da huy tu dong={cancelled} | "
-        f"khung loi={read_failures}"
+        f"van moi={rounds} | khung loi={read_failures}"
     )
     return 0
 

@@ -94,11 +94,15 @@ def load_gameplay_button_detector(template_dir: str | Path) -> TemplateButtonDet
     # "Hủy tự động" does not sit in the action band: it is drawn over the fan,
     # low and centred, so it needs its own search window.
     cancel_search = NormalizedRect(0.31, 0.75, 0.40, 0.23)
+    # "Tiếp Tục" appears on the round-end screen, right of centre, and is what
+    # keeps a session going from one round to the next.
+    continue_search = NormalizedRect(0.50, 0.52, 0.30, 0.20)
     definitions = (
         ("pass_enabled.png", ButtonId.PASS, "Bỏ Lượt", True, search),
         ("play_enabled.png", ButtonId.PLAY, "Đánh", True, search),
         ("play_disabled.png", ButtonId.PLAY, "Đánh", False, search),
         ("cancel_auto.png", ButtonId.CANCEL_AUTO, "Hủy tự động", True, cancel_search),
+        ("continue_round.png", ButtonId.READY, "Tiếp Tục", True, continue_search),
     )
     templates = []
     for filename, button_id, label, enabled, roi in definitions:
