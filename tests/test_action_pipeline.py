@@ -84,3 +84,15 @@ class ActionPipelineTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SkipSelectionTests(unittest.TestCase):
+    """A retry must not re-tap cards whose selection may already be right."""
+
+    def test_skip_selection_presses_only_the_button(self) -> None:
+        state = snapshot()
+        plan = ActionPlanBuilder().build({"action": "play", "cards": ["3S"]}, state)
+        controller = StubController()
+        taps = ActionTapExecutor(controller).execute(plan, state, skip_selection=True)
+        self.assertEqual([t.target for t in taps], [str(ButtonId.PLAY)])
+        self.assertEqual(len(controller.taps), 1)

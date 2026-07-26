@@ -12,6 +12,13 @@ out and auto-play re-engage, one round poorer. Cancelling is only an improvement
 if something is going to play the turn. A dry run reports the state and leaves it
 alone.
 
+Timing is the constraint. Each turn has a 13-second countdown; miss it and the
+game plays a legal move for you, and after two misses it takes over entirely and
+shows "Huy tu dong". The loop itself costs about 50ms, so the poll interval is
+what decides how much of those 13 seconds is left to act in - it defaults to
+0.3s, and the sleep is skipped entirely on a turn we are acting on, so a retry
+lands inside the same countdown instead of the next one.
+
 Capture here is `adb exec-out screencap`, which the architecture rules bar from
 the production hot path. This is an operator and development tool; the runtime
 capture path stays Windows-side and HWND-bound.
@@ -88,7 +95,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--serial", required=True)
     parser.add_argument("--adb-path", default="adb")
-    parser.add_argument("--interval", type=float, default=1.0)
+    parser.add_argument("--interval", type=float, default=0.3)
     parser.add_argument("--max-steps", type=int, default=200)
     parser.add_argument(
         "--act", action="store_true",
@@ -125,6 +132,7 @@ def main() -> int:
     )
 
     acted = cancelled = read_failures = rounds = 0
+    last_signature = None
     for step in range(args.max_steps):
         if stop.is_set():
             break
@@ -192,13 +200,24 @@ def main() -> int:
             time.sleep(args.interval)
             continue
 
+        # If the same decision comes back on an unchanged hand, the previous
+        # attempt did not land. Re-tapping the cards would toggle a selection
+        # that may already be correct, so press the button alone and let the
+        # game judge it.
+        signature = (tuple(outcome.plan.cards), describe(outcome))
+        repeated = signature == last_signature
+        last_signature = signature
         try:
-            taps = executor.execute(outcome.plan, outcome.snapshot)
+            taps = executor.execute(
+                outcome.plan, outcome.snapshot, skip_selection=repeated
+            )
             acted += 1
-            log(f"   da bam {len(taps)} lan: {[(t.target, t.x, t.y) for t in taps]}")
+            note = " (lap lai: chi bam nut)" if repeated else ""
+            log(f"   da bam {len(taps)} lan{note}: {[(t.target, t.x, t.y) for t in taps]}")
         except ValueError as exc:
             log(f"   khong thuc hien duoc: {exc}", "WARN")
-        time.sleep(args.interval)
+        # No sleep here on purpose. The countdown is already running; if this
+        # attempt did not land, the next look should happen inside the same turn.
 
     log(
         f"Ket thuc | da danh={acted} | da huy tu dong={cancelled} | "
