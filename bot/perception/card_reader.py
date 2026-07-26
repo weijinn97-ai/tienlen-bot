@@ -41,6 +41,12 @@ HAND_HEIGHT = (170, 225)
 HAND_MIN_Y = 450
 MIN_CARD_WIDTH = 28
 
+# Tapping a hand card lifts it clear of the fan. Measured live: the lifted card
+# sat at y=460 between neighbours at 516 and 510, so the gap is about 50px while
+# the fan's own curve moves at most 9px between adjacent cards. 25px separates
+# the two without being tight.
+SELECTED_LIFT = 25
+
 # Table glyph windows as a fraction of card height.
 RANK_Y = (0.03, 0.33)
 SUIT_Y = (0.34, 0.56)
@@ -237,9 +243,11 @@ class CardReader:
 
         if self._hand_ranks is not None:
             boxes, labels = self._hand_boxes(image, white)
-            for box, index in boxes:
+            lifted = self._lifted(boxes)
+            for position, (box, index) in enumerate(boxes):
                 self._collect(
-                    detections, image, box, CardZone.MY_HAND,
+                    detections, image, box,
+                    CardZone.SELECTED if lifted[position] else CardZone.MY_HAND,
                     self._classify_hand(image, box, white, labels, index),
                 )
 
@@ -348,6 +356,29 @@ class CardReader:
                 return None
             crops.append(crop)
         return self._decide_hand(crops[0], crops[1])
+
+    @staticmethod
+    def _lifted(boxes: list[tuple[tuple[int, int, int, int], int]]) -> list[bool]:
+        """Flag hand cells the player has already selected.
+
+        A tapped card rises clear of the fan. The fan itself is a smooth curve -
+        adjacent cards differ by at most 9px in the observed hands - so a card
+        sitting well above both its neighbours is selected, not just further
+        along the arc. Comparing against neighbours rather than an absolute row
+        keeps this true wherever the fan sits on screen.
+
+        Without this the bot re-taps a card it has already selected, which
+        deselects it, and the turn loops until the clock runs out.
+        """
+        tops = [box[1] for box, _index in boxes]
+        flags = []
+        for position, top in enumerate(tops):
+            neighbours = tops[max(0, position - 1) : position] + tops[position + 1 : position + 2]
+            if not neighbours:
+                flags.append(False)
+                continue
+            flags.append(top + SELECTED_LIFT < min(neighbours))
+        return flags
 
     @staticmethod
     def _upright_origin(
