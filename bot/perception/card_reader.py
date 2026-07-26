@@ -5,10 +5,13 @@ is the same pixels every time it appears. That makes classical template matching
 a better fit than a learned detector: it needs no training data, no annotation
 and no GPU, and it runs in single-digit milliseconds.
 
-Scope: `CardZone.TABLE` only. Hand cards are drawn larger and rotated into a fan,
-and the flat templates do not transfer to them - measured duplicate rate is 30.9%
-in the hand zone against 3.0% on the table. Reading the hand needs deskewing and
-its own template bank; until that exists this reader must not be pointed at it.
+Both zones are supported, but they need different handling. Table cards are drawn
+flat and axis-aligned. Hand cards are drawn about 1.6x larger and rotated into a
+fan (measured -8.8 to +2.9 degrees across a 13-card hand), and are clipped by the
+bottom of the screen, so their bounding box height is not the card height. Each
+hand card is therefore deskewed by the angle of its own top edge before its index
+is read, and matched against a separate template bank: reusing the flat table
+templates on hand glyphs scores 0/13.
 
 Precision is preferred over recall throughout. A dropped card is retried by the
 next frame; a wrong card produces an illegal play that nothing downstream can
@@ -25,20 +28,32 @@ import numpy as np
 from contracts.interfaces import CardZone, DetectedCard, Rect
 
 TEMPLATE_ASSET = Path(__file__).resolve().parent / "card_templates.npz"
+HAND_TEMPLATE_ASSET = Path(__file__).resolve().parent / "hand_templates.npz"
 
 FRAME_SHAPE = (720, 1280, 3)
 WHITE_THRESHOLD = 190
 INK_THRESHOLD = 160
 GLYPH_SIZE = (24, 32)  # (w, h)
 
-# Card box filter for the table zone, measured from real 1280x720 frames.
+# Card box filters, measured from real 1280x720 frames.
 TABLE_HEIGHT = (110, 145)
+HAND_HEIGHT = (170, 225)
+HAND_MIN_Y = 450
 MIN_CARD_WIDTH = 28
 
-# Glyph windows as a fraction of card height.
+# Table glyph windows as a fraction of card height.
 RANK_Y = (0.03, 0.33)
 SUIT_Y = (0.34, 0.56)
 GLYPH_X = (0.02, 0.42)
+
+# Hand cards render about 1.62x table size. Their box height is set by screen
+# clipping rather than by the card, so these windows are absolute pixel offsets
+# from the deskewed card's top-left corner instead of fractions of the box.
+HAND_SCALE = 1.62
+HAND_RANK_BOX = (6, 9, 58, 68)
+HAND_SUIT_BOX = (6, 71, 58, 116)
+HAND_EDGE_SAMPLE = 60
+MIN_EDGE_POINTS = 10
 
 # A rank further than this from all 13 templates is refused rather than guessed.
 # At 0.20 the labelled set reads with no errors; 0.25 admits three, so the extra
@@ -55,6 +70,15 @@ MAX_RANK_DISTANCE = 0.20
 # for nothing. 0.015 sits in the middle of the safe plateau.
 MIN_SUIT_MARGIN = 0.015
 MAX_SUIT_DISTANCE = 0.32
+
+# The hand zone needs a stricter suit margin than the table. Deskewing leaves
+# more residual variation in the suit glyph, and at the table's 0.015 the hand
+# reads 91.7% precision with 6.2% of hands coming back out of sort order. Swept:
+# 0.09 is the first value giving 100% precision and zero order violations across
+# 147 frames. It costs recall - 59.5% down to 32.4% - which is the intended
+# direction of that trade, but see the module docstring: hand recall is not yet
+# good enough to drive play.
+MIN_SUIT_MARGIN_HAND = 0.09
 
 RED_SUITS = frozenset({"D", "H"})
 MIN_RED_DOMINANCE = 25.0
@@ -106,10 +130,18 @@ def _is_red(crop: np.ndarray) -> bool:
 
 
 class CardReader:
-    """Reads table cards from a frame. Stateless and safe to share."""
+    """Reads table and hand cards from a frame. Stateless and safe to share."""
 
-    def __init__(self, template_path: Path | str = TEMPLATE_ASSET) -> None:
+    def __init__(
+        self,
+        template_path: Path | str = TEMPLATE_ASSET,
+        hand_template_path: Path | str | None = HAND_TEMPLATE_ASSET,
+    ) -> None:
         self._ranks, self._suits = _load_templates(Path(template_path))
+        self._hand_ranks: dict[str, np.ndarray] | None = None
+        self._hand_suits: dict[str, np.ndarray] | None = None
+        if hand_template_path is not None:
+            self._hand_ranks, self._hand_suits = _load_templates(Path(hand_template_path))
 
     # The template bank is loaded in __init__ and there is no lazy state, so
     # the first detect() costs the same as every later one. Callers still get an
@@ -123,28 +155,109 @@ class CardReader:
         if image.shape != FRAME_SHAPE:
             raise ValueError(f"Card reader expects {FRAME_SHAPE} frames, got {image.shape}.")
 
-        detections: dict[str, DetectedCard] = {}
+        white = self._white_mask(image)
+        detections: dict[tuple[str, CardZone], DetectedCard] = {}
+
         for box in self._card_boxes(image):
-            result = self._classify(image, box)
-            if result is None:
-                continue
-            code, confidence = result
-            x, y, width, height = box
-            existing = detections.get(code)
-            if existing is not None:
-                # The same physical card cannot appear twice. Keep the stronger
-                # read and drop the other rather than emitting a known error.
-                if existing.confidence >= confidence:
-                    continue
-            detections[code] = DetectedCard(
-                code=code,
-                roi=Rect(x=x, y=y, width=width, height=height),
-                zone=CardZone.TABLE,
-                confidence=confidence,
-            )
+            self._collect(detections, image, box, CardZone.TABLE, self._classify(image, box))
+
+        if self._hand_ranks is not None:
+            for box in self._hand_boxes(image, white):
+                self._collect(
+                    detections, image, box, CardZone.MY_HAND,
+                    self._classify_hand(image, box, white),
+                )
 
         return tuple(
-            sorted(detections.values(), key=lambda c: (c.roi.y, c.roi.x, c.code))
+            sorted(detections.values(), key=lambda c: (c.zone.value, c.roi.y, c.roi.x, c.code))
+        )
+
+    @staticmethod
+    def _collect(detections, image, box, zone, result) -> None:
+        if result is None:
+            return
+        code, confidence = result
+        x, y, width, height = box
+        key = (code, zone)
+        existing = detections.get(key)
+        # The same physical card cannot appear twice in one zone. Keep the
+        # stronger read and drop the other rather than emitting a known error.
+        if existing is not None and existing.confidence >= confidence:
+            return
+        detections[key] = DetectedCard(
+            code=code,
+            roi=Rect(x=x, y=y, width=width, height=height),
+            zone=zone,
+            confidence=confidence,
+        )
+
+    @staticmethod
+    def _white_mask(image: np.ndarray) -> np.ndarray:
+        grey = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        _, mask = cv2.threshold(grey, WHITE_THRESHOLD, 255, cv2.THRESH_BINARY)
+        return mask
+
+    def _hand_boxes(self, image: np.ndarray, white: np.ndarray) -> list[tuple[int, int, int, int]]:
+        count, _, stats, _ = cv2.connectedComponentsWithStats(white, 8)
+        boxes = []
+        for index in range(1, count):
+            x = int(stats[index, cv2.CC_STAT_LEFT])
+            y = int(stats[index, cv2.CC_STAT_TOP])
+            width = int(stats[index, cv2.CC_STAT_WIDTH])
+            height = int(stats[index, cv2.CC_STAT_HEIGHT])
+            if (
+                width >= MIN_CARD_WIDTH
+                and HAND_HEIGHT[0] <= height <= HAND_HEIGHT[1]
+                and y > HAND_MIN_Y
+            ):
+                boxes.append((x, y, width, height))
+        return sorted(boxes)
+
+    @staticmethod
+    def _top_edge_angle(white: np.ndarray, box: tuple[int, int, int, int]) -> float | None:
+        """Fit the card's visible top edge; its slope is the fan rotation."""
+        x, y, width, _height = box
+        xs, ys = [], []
+        for column in range(x + 3, x + min(width, HAND_EDGE_SAMPLE)):
+            rows = np.nonzero(white[y : y + HAND_EDGE_SAMPLE, column])[0]
+            if len(rows):
+                xs.append(column)
+                ys.append(y + int(rows[0]))
+        if len(xs) < MIN_EDGE_POINTS:
+            return None
+        slope = float(np.polyfit(np.array(xs, dtype=float), np.array(ys, dtype=float), 1)[0])
+        return float(np.degrees(np.arctan(slope)))
+
+    def _classify_hand(
+        self, image: np.ndarray, box: tuple[int, int, int, int], white: np.ndarray
+    ) -> tuple[str, float] | None:
+        angle = self._top_edge_angle(white, box)
+        if angle is None:
+            return None
+        x, y, width, _height = box
+        pad = 40
+        x0, y0 = max(0, x - pad), max(0, y - pad)
+        x1 = min(image.shape[1], x + min(width, 120) + pad)
+        y1 = min(image.shape[0], y + 140 + pad)
+        patch = image[y0:y1, x0:x1]
+        if patch.size == 0:
+            return None
+        centre = (float(x - x0), float(y - y0))
+        matrix = cv2.getRotationMatrix2D(centre, angle, 1.0)
+        upright = cv2.warpAffine(
+            patch, matrix, (patch.shape[1], patch.shape[0]),
+            flags=cv2.INTER_LINEAR, borderMode=cv2.BORDER_REPLICATE,
+        )
+        cx, cy = int(centre[0]), int(centre[1])
+        crops = []
+        for bx0, by0, bx1, by1 in (HAND_RANK_BOX, HAND_SUIT_BOX):
+            crop = upright[cy + by0 : cy + by1, cx + bx0 : cx + bx1]
+            if crop.size == 0:
+                return None
+            crops.append(crop)
+        return self._decide(
+            crops[0], crops[1], self._hand_ranks, self._hand_suits,
+            suit_margin=MIN_SUIT_MARGIN_HAND,
         )
 
     def _card_boxes(self, image: np.ndarray) -> list[tuple[int, int, int, int]]:
@@ -181,23 +294,34 @@ class CardReader:
         suit_crop = self._window(image, box, SUIT_Y)
         if rank_crop is None or suit_crop is None:
             return None
+        return self._decide(rank_crop, suit_crop, self._ranks, self._suits)
+
+    def _decide(
+        self,
+        rank_crop: np.ndarray,
+        suit_crop: np.ndarray,
+        rank_templates: dict[str, np.ndarray],
+        suit_templates: dict[str, np.ndarray],
+        *,
+        suit_margin: float = MIN_SUIT_MARGIN,
+    ) -> tuple[str, float] | None:
         rank_glyph = _normalise_glyph(rank_crop)
         suit_glyph = _normalise_glyph(suit_crop)
         if rank_glyph is None or suit_glyph is None:
             return None
 
-        rank, rank_distance, runner_up = self._match(self._ranks, rank_glyph)
+        rank, rank_distance, runner_up = self._match(rank_templates, rank_glyph)
         if rank is None or rank_distance > MAX_RANK_DISTANCE:
             return None
 
         # Colour narrows the suit to two candidates before shape matching, which
         # removes the whole class of red/black confusions.
         red = _is_red(suit_crop)
-        candidates = {k: v for k, v in self._suits.items() if (k in RED_SUITS) == red}
+        candidates = {k: v for k, v in suit_templates.items() if (k in RED_SUITS) == red}
         suit, suit_distance, suit_runner_up = self._match(candidates, suit_glyph)
         if suit is None or suit_distance > MAX_SUIT_DISTANCE:
             return None
-        if suit_runner_up - suit_distance < MIN_SUIT_MARGIN:
+        if suit_runner_up - suit_distance < suit_margin:
             return None
 
         margin = max(0.0, runner_up - rank_distance)

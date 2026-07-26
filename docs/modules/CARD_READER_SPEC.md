@@ -1,6 +1,6 @@
 # Card Reader Module — Interface Specification
 
-Status: `IMPLEMENTED — table zone only`
+Status: `IMPLEMENTED — table zone usable, hand zone precision-only`
 Owner-authorised: CUDA torch install, GTX 1650 reference device, per-machine device selection.
 
 This document is the contract other agents work against. It defines the module
@@ -17,10 +17,12 @@ pixels.
 
 Path: `bot/perception/card_reader.py`
 
-**Scope: `CardZone.TABLE` only.** Hand cards are drawn larger and rotated into a
-fan; flat templates do not transfer. Measured duplicate rate is 30.9% in the hand
-zone against 3.0% on the table, so the reader deliberately refuses to look there.
-Reading the hand needs deskewing and its own template bank.
+**Both zones are read, with different pipelines.** Table cards are flat and
+axis-aligned. Hand cards render ~1.6x larger, are rotated into a fan (measured
+-8.8 to +2.9 degrees across 13 cards) and are clipped by the bottom of the
+screen, so their box height is not the card height. Each hand card is deskewed by
+the angle of its own top edge, then matched against a separate template bank -
+reusing the flat table templates on hand glyphs scores 0/13.
 
 The module plugs into the existing `PerceptionPipeline` as its card adapter. The
 pipeline already defines the required shape:
@@ -149,6 +151,32 @@ candidates rather than absolute distance.
 A frame that reports the same physical card twice is provably wrong without
 needing ground truth, so this is an error lower bound measured on the whole
 corpus rather than a sample. It was 26.16% before thresholding and is now zero.
+
+### Hand zone, measured
+
+| Metric | Value |
+|---|---|
+| Precision (37 transcribed hand cards) | **100.0%** (12 correct, 0 wrong) |
+| Recall | **32.4%** |
+
+Label-free check, using the fact that the game displays a hand sorted by Tien Len
+strength — any hand returned out of order is provably wrong:
+
+| Metric | Value |
+|---|---|
+| Frames with hand cards | 147 |
+| **Hands returned out of sort order** | **0 (0.0%)** |
+| Frames with a duplicate hand card | 0 |
+
+The hand zone uses a stricter suit margin than the table (0.09 vs 0.015). At the
+table's value the hand reads 91.7% precision with 6.2% of hands out of order;
+0.09 is the first value reaching 100% precision and zero order violations, at the
+cost of recall falling from 59.5% to 32.4%.
+
+**Hand recall is not good enough to drive play.** At 32.4% the bot sees roughly 2
+of its 13 cards. It cannot choose a move from that. Raising hand recall while
+holding precision is the next piece of work, and it needs better hand suit
+templates rather than more frames.
 
 ### Gates not yet met
 

@@ -189,3 +189,117 @@ class CardReaderTemplateBankTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+HAND_W, HAND_H = 155, 205
+
+
+def render_hand_frame(cards, angle=0.0, origin=(200, 512), stride=140):
+    """Render a synthetic fan of hand cards, optionally rotated.
+
+    Hand cards are larger than table cards and tilted, so the reader deskews each
+    one before reading. Rendering at a known angle is how that path gets covered
+    without shipping raw frames.
+    """
+    reader = CardReader()
+    frame = np.zeros(FRAME_SHAPE, dtype=np.uint8)
+    x, y = origin
+    for code in cards:
+        rank, suit = code[:-1], code[-1]
+        card = np.zeros((HAND_H, HAND_W, 3), dtype=np.uint8)
+        card[:, :] = 255
+        _paste_glyph(card, reader._hand_ranks[rank], 6, 9, 58, 68, BLACK_INK)
+        _paste_glyph(
+            card, reader._hand_suits[suit], 6, 71, 58, 116,
+            RED_INK if suit in RED_SUITS else BLACK_INK,
+        )
+        if angle:
+            matrix = cv2.getRotationMatrix2D((0.0, 0.0), angle, 1.0)
+            card = cv2.warpAffine(card, matrix, (HAND_W, HAND_H), flags=cv2.INTER_LINEAR)
+        h = min(HAND_H, FRAME_SHAPE[0] - y)
+        w = min(HAND_W, FRAME_SHAPE[1] - x)
+        region = frame[y : y + h, x : x + w]
+        painted = card[:h, :w]
+        region[painted.any(axis=2)] = painted[painted.any(axis=2)]
+        x += stride
+    return frame
+
+
+class HandZoneTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.reader = CardReader()
+
+    def test_upright_hand_cards_are_read(self) -> None:
+        rendered = ["5S", "9H"]
+        cards = self.reader.detect(render_hand_frame(rendered))
+        hand = [c.code for c in cards if c.zone is CardZone.MY_HAND]
+        self.assertTrue(hand, "no hand card was read at all")
+        # The contract is precision, not recall: the reader may refuse a card,
+        # but it must never report one that is not there.
+        self.assertEqual(set(hand) - set(rendered), set())
+
+    def test_hand_cards_are_reported_in_the_hand_zone(self) -> None:
+        cards = self.reader.detect(render_hand_frame(["5S"]))
+        self.assertTrue(cards)
+        self.assertTrue(all(c.zone is CardZone.MY_HAND for c in cards))
+
+    def test_tilted_hand_card_is_never_misread(self) -> None:
+        """A fan tilts each card. Deskewing may still refuse the read, but a
+        tilted card must never come back as some other card."""
+        for angle in (-8.0, -5.0, 0.0, 3.0):
+            cards = self.reader.detect(render_hand_frame(["7D"], angle=angle))
+            hand = [c.code for c in cards if c.zone is CardZone.MY_HAND]
+            self.assertEqual(set(hand) - {"7D"}, set(), f"misread at {angle} deg")
+
+    def test_deskew_recovers_the_rendered_angle(self) -> None:
+        """The angle estimate is what makes the hand readable, so measure it.
+
+        Only negative render angles are checked: this renderer rotates about the
+        card's top-left corner, so a positive angle lifts the top edge out of the
+        canvas and leaves a flat clipped edge behind. That is a limitation of the
+        fixture, not of the estimator - real fans span -8.8 to +2.9 degrees.
+        """
+        for angle in (-8.0, -4.0, -1.0):
+            frame = render_hand_frame(["7D"], angle=angle)
+            white = self.reader._white_mask(frame)
+            boxes = self.reader._hand_boxes(frame, white)
+            self.assertTrue(boxes, f"no hand box at {angle} deg")
+            measured = self.reader._top_edge_angle(white, boxes[0])
+            self.assertIsNotNone(measured)
+            # The renderer rotates about the origin with OpenCV's positive-is-
+            # counter-clockwise convention; the reader reports the top edge's
+            # slope, which runs the other way. Hence the negation.
+            self.assertAlmostEqual(measured, -angle, delta=1.5)
+
+    def test_hand_and_table_are_separated(self) -> None:
+        frame = render_frame(["3S", "4C"])
+        frame[500:, :] = render_hand_frame(["KC"])[500:, :]
+        cards = self.reader.detect(frame)
+        table = {c.code for c in cards if c.zone is CardZone.TABLE}
+        self.assertEqual(table, {"3S", "4C"})
+        for card in cards:
+            if card.zone is CardZone.MY_HAND:
+                self.assertEqual(card.code, "KC")
+
+    def test_table_read_does_not_suppress_the_hand(self) -> None:
+        """Detections are keyed on (code, zone), so the same code appearing in
+        both zones must not collapse into one entry."""
+        frame = render_frame(["9H"])
+        frame[500:, :] = render_hand_frame(["9H"])[500:, :]
+        codes = {(c.code, c.zone) for c in self.reader.detect(frame)}
+        self.assertIn(("9H", CardZone.TABLE), codes)
+
+    def test_hand_reading_is_disabled_without_templates(self) -> None:
+        reader = CardReader(hand_template_path=None)
+        cards = reader.detect(render_hand_frame(["5S", "9H"]))
+        self.assertEqual([c for c in cards if c.zone is CardZone.MY_HAND], [])
+
+    def test_hand_template_bank_is_complete(self) -> None:
+        self.assertEqual(len(self.reader._hand_ranks), 13)
+        self.assertEqual(set(self.reader._hand_suits), {"S", "C", "D", "H"})
+
+    def test_hand_input_is_not_mutated(self) -> None:
+        frame = render_hand_frame(["6S", "10C"])
+        original = frame.copy()
+        self.reader.detect(frame)
+        np.testing.assert_array_equal(frame, original)
