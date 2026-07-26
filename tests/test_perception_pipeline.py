@@ -194,5 +194,196 @@ class PerceptionPipelineTests(unittest.TestCase):
         self.assertEqual(result.failures[0].component, FailureComponent.FRAME)
 
 
+class MalformedAdapterOutputTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.image = np.full((100, 160, 3), 7, dtype=np.uint8)
+        self.card = DetectedCard("AH", Rect(20, 20, 15, 30), CardZone.MY_HAND, 0.98)
+        self.cards = Cards(self.card)
+        self.buttons = Buttons()
+
+    def _failure(self, result, component: FailureComponent):
+        matches = [failure for failure in result.failures if failure.component == component]
+        self.assertTrue(matches, f"expected a {component.value} failure, got {result.failures}")
+        return matches[0]
+
+    def test_card_output_with_wrong_item_type_is_reported_and_dropped(self) -> None:
+        class BadCards:
+            def detect(self, frame: np.ndarray):
+                return [object()]
+
+        pipeline = PerceptionPipeline(PerceptionAdapters(BadCards(), self.buttons))
+        result = pipeline.process(make_frame(self.image))
+
+        self.assertFalse(result.ok)
+        self._failure(result, FailureComponent.CARDS)
+        assert result.snapshot is not None
+        self.assertEqual(result.snapshot.cards, ())
+
+    def test_card_output_that_is_a_bare_string_is_rejected(self) -> None:
+        class StringCards:
+            def detect(self, frame: np.ndarray):
+                return "AH"
+
+        pipeline = PerceptionPipeline(PerceptionAdapters(StringCards(), self.buttons))
+        result = pipeline.process(make_frame(self.image))
+
+        self.assertFalse(result.ok)
+        self._failure(result, FailureComponent.CARDS)
+        assert result.snapshot is not None
+        self.assertEqual(result.snapshot.cards, ())
+
+    def test_button_output_with_wrong_item_type_falls_back_to_safe_buttons(self) -> None:
+        class BadButtons:
+            def detect(self, frame: np.ndarray):
+                return ["play"]
+
+        pipeline = PerceptionPipeline(PerceptionAdapters(self.cards, BadButtons()))
+        result = pipeline.process(make_frame(self.image))
+
+        self.assertFalse(result.ok)
+        self._failure(result, FailureComponent.BUTTONS)
+        assert result.snapshot is not None
+        self.assertTrue(result.snapshot.buttons)
+        self.assertTrue(
+            all(not button.is_visible and not button.is_enabled for button in result.snapshot.buttons)
+        )
+
+    def test_non_mapping_ocr_output_is_reported(self) -> None:
+        class BadOcr:
+            def recognize(self, frame: np.ndarray):
+                return [("room", OcrText("room-7", Rect(0, 0, 20, 10), 0.95))]
+
+        pipeline = PerceptionPipeline(PerceptionAdapters(self.cards, self.buttons, BadOcr()))
+        result = pipeline.process(make_frame(self.image))
+
+        self.assertFalse(result.ok)
+        self._failure(result, FailureComponent.OCR)
+        self.assertEqual(result.ocr_fields, ())
+
+    def test_ocr_mapping_with_wrong_value_type_is_reported(self) -> None:
+        class BadOcrValue:
+            def recognize(self, frame: np.ndarray):
+                return {"room": "room-7"}
+
+        pipeline = PerceptionPipeline(PerceptionAdapters(self.cards, self.buttons, BadOcrValue()))
+        result = pipeline.process(make_frame(self.image))
+
+        self.assertFalse(result.ok)
+        self._failure(result, FailureComponent.OCR)
+        self.assertEqual(result.ocr_fields, ())
+
+    def test_turn_output_of_wrong_type_clears_owner(self) -> None:
+        class BadTurn:
+            def detect(self, frame: np.ndarray, **kwargs):
+                return "self"
+
+        pipeline = PerceptionPipeline(
+            PerceptionAdapters(self.cards, self.buttons, turn=BadTurn())
+        )
+        result = pipeline.process(
+            make_frame(self.image),
+            previous_card_counts={SeatPosition.LEFT: 5},
+            current_card_counts={SeatPosition.LEFT: 4},
+        )
+
+        self.assertFalse(result.ok)
+        self._failure(result, FailureComponent.TURN)
+        assert result.snapshot is not None
+        self.assertIsNone(result.snapshot.turn_owner)
+        self.assertIsNone(result.snapshot.turn_owner_evidence)
+
+    def test_out_of_range_card_counts_are_reported(self) -> None:
+        pipeline = PerceptionPipeline(PerceptionAdapters(self.cards, self.buttons))
+        result = pipeline.process(
+            make_frame(self.image),
+            current_card_counts={SeatPosition.LEFT: 14},
+        )
+
+        self.assertFalse(result.ok)
+        self._failure(result, FailureComponent.TURN)
+        assert result.snapshot is not None
+        self.assertEqual(result.snapshot.player_card_counts, {})
+
+
+class DeterministicOrderingTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.image = np.full((100, 160, 3), 7, dtype=np.uint8)
+        self.unsorted_cards = [
+            DetectedCard("3S", Rect(50, 10, 15, 30), CardZone.TABLE, 0.90),
+            DetectedCard("AH", Rect(30, 80, 15, 30), CardZone.MY_HAND, 0.95),
+            DetectedCard("KD", Rect(10, 40, 15, 30), CardZone.SELECTED, 0.92),
+            DetectedCard("2H", Rect(10, 80, 15, 30), CardZone.MY_HAND, 0.95),
+        ]
+        self.unsorted_buttons = [
+            ButtonState(ButtonId.PLAY, "Play", Rect(40, 80, 20, 10), confidence=0.9),
+            ButtonState(ButtonId.HINT, "Hint", Rect(10, 80, 20, 10), confidence=0.9),
+            ButtonState(ButtonId.PASS, "Pass", Rect(70, 80, 20, 10), confidence=0.9),
+        ]
+        self.unsorted_ocr = {
+            "room": OcrText("room-7", Rect(0, 0, 20, 10), 0.95),
+            "balance": OcrText("120000", Rect(0, 20, 20, 10), 0.95),
+            "round": OcrText("3", Rect(0, 40, 20, 10), 0.95),
+        }
+
+        outer = self
+
+        class MultiCards:
+            def detect(self, frame: np.ndarray):
+                return list(outer.unsorted_cards)
+
+        class MultiButtons:
+            def detect(self, frame: np.ndarray):
+                return list(outer.unsorted_buttons)
+
+        class MultiOcr:
+            def recognize(self, frame: np.ndarray):
+                return dict(outer.unsorted_ocr)
+
+        self.pipeline = PerceptionPipeline(
+            PerceptionAdapters(MultiCards(), MultiButtons(), MultiOcr())
+        )
+
+    def test_cards_are_ordered_by_zone_then_position_then_code(self) -> None:
+        result = self.pipeline.process(make_frame(self.image))
+
+        assert result.snapshot is not None
+        self.assertEqual(
+            [card.code for card in result.snapshot.cards],
+            ["2H", "AH", "KD", "3S"],
+        )
+
+    def test_buttons_and_ocr_fields_are_ordered(self) -> None:
+        result = self.pipeline.process(make_frame(self.image))
+
+        assert result.snapshot is not None
+        self.assertEqual(
+            [button.button_id for button in result.snapshot.buttons],
+            [ButtonId.HINT, ButtonId.PASS, ButtonId.PLAY],
+        )
+        self.assertEqual(
+            [field for field, _ in result.ocr_fields],
+            ["balance", "room", "round"],
+        )
+
+    def test_ordering_is_stable_across_runs(self) -> None:
+        frame = make_frame(self.image)
+        first = self.pipeline.process(frame)
+        second = self.pipeline.process(frame)
+
+        assert first.snapshot is not None and second.snapshot is not None
+        self.assertEqual(
+            [card.code for card in first.snapshot.cards],
+            [card.code for card in second.snapshot.cards],
+        )
+        self.assertEqual(
+            [button.button_id for button in first.snapshot.buttons],
+            [button.button_id for button in second.snapshot.buttons],
+        )
+        self.assertEqual(
+            [field for field, _ in first.ocr_fields],
+            [field for field, _ in second.ocr_fields],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()
