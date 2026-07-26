@@ -92,6 +92,9 @@ class ButtonId(str, Enum):
     READY = "ready"
     START = "start"
     HINT = "hint"
+    # Shown only while the game is playing the hand for the player. It is not an
+    # action the bot chooses; it is how the bot takes its turn back.
+    CANCEL_AUTO = "cancel_auto"
     UNKNOWN = "unknown"
 
 

@@ -1,0 +1,181 @@
+"""Join perception, rules and action planning into one decision per frame.
+
+Every part of this chain already existed - a card reader, a button detector, a
+state assembler, a rules engine, a tap planner - but nothing connected them, so
+the repository could read a frame and could plan a tap and could not get from one
+to the other.
+
+This is that join and nothing more. It decides; it does not tap. Execution stays
+with ActionTapExecutor so a turn can be replayed against recorded frames without
+an emulator attached, which is how the numbers in the module spec were measured.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, replace
+from typing import Any, Mapping
+
+import numpy as np
+
+from bot.actions.action_pipeline import ActionPlanBuilder
+from bot.agent.game_state_adapter import GameStateAdapter
+from bot.agent.local_agent import LocalAgent
+from bot.perception.pipeline import PerceptionPipeline, PipelineFailure
+from bot.perception.table_state import TableStateAssembler
+from bot.perception.turn_owner import YellowHighlightDetector
+from bot.runtime.schemas import FrameEnvelope
+from contracts.interfaces import (
+    ActionKind,
+    ActionPlan,
+    ButtonId,
+    ButtonState,
+    GamePhase,
+    PerceptionSnapshot,
+    SeatPosition,
+    TableState,
+    TurnOwnerEvidence,
+    TurnPrimarySignal,
+)
+
+ACTION_BUTTONS = (ButtonId.PLAY, ButtonId.PASS)
+
+
+@dataclass(frozen=True)
+class TurnOutcome:
+    """What one frame produced, at every stage, including where it stopped."""
+
+    snapshot: PerceptionSnapshot | None
+    state: TableState | None
+    decision: Mapping[str, Any]
+    plan: ActionPlan | None
+    failures: tuple[PipelineFailure, ...] = ()
+    recovery: ButtonState | None = None
+
+    @property
+    def is_my_turn(self) -> bool:
+        return self.state is not None and self.state.turn_owner is SeatPosition.SELF
+
+    @property
+    def acts(self) -> bool:
+        return self.plan is not None and self.plan.kind is not ActionKind.WAIT
+
+
+def _waiting(reason: str, **fields: Any) -> TurnOutcome:
+    return TurnOutcome(
+        snapshot=fields.get("snapshot"),
+        state=fields.get("state"),
+        decision={"action": ActionKind.WAIT.value, "reason": reason},
+        plan=None,
+        failures=fields.get("failures", ()),
+    )
+
+
+class TurnLoop:
+    """Turn one frame into a decision, or into a documented reason not to act."""
+
+    def __init__(
+        self,
+        pipeline: PerceptionPipeline,
+        *,
+        highlight: YellowHighlightDetector | None = None,
+        assembler: TableStateAssembler | None = None,
+        adapter: GameStateAdapter | None = None,
+        agent: LocalAgent | None = None,
+        planner: ActionPlanBuilder | None = None,
+    ) -> None:
+        self.pipeline = pipeline
+        self.highlight = highlight or YellowHighlightDetector()
+        self.assembler = assembler or TableStateAssembler()
+        self.adapter = adapter or GameStateAdapter()
+        self.agent = agent or LocalAgent()
+        self.planner = planner or ActionPlanBuilder()
+
+    def step(self, frame: FrameEnvelope, *, game_phase: GamePhase = GamePhase.PLAYING) -> TurnOutcome:
+        result = self.pipeline.process(frame, game_phase=game_phase)
+        if result.snapshot is None:
+            return _waiting("frame_rejected", failures=result.failures)
+
+        snapshot = self._with_turn_owner(result.snapshot, frame.image)
+        state = self.assembler.build(snapshot)
+
+        # While "Hủy tự động" is on screen the game is playing the hand itself,
+        # so any decision made from this frame would be acted on by nobody. The
+        # only useful move is to take the turn back, and it has to happen before
+        # the clock runs out again.
+        recovery = next(
+            (
+                button
+                for button in snapshot.buttons
+                if button.button_id is ButtonId.CANCEL_AUTO and button.is_visible
+            ),
+            None,
+        )
+        if recovery is not None:
+            return TurnOutcome(
+                snapshot, state,
+                {"action": ActionKind.WAIT.value, "reason": "auto_play_engaged"},
+                None, result.failures, recovery,
+            )
+
+        if state.turn_owner is not SeatPosition.SELF:
+            return _waiting("not_my_turn", snapshot=snapshot, state=state, failures=result.failures)
+
+        decision = self.agent.decide_action(self.adapter.adapt_state(state))
+        if decision.get("action") == ActionKind.WAIT.value:
+            return TurnOutcome(snapshot, state, decision, None, result.failures)
+
+        try:
+            plan = self.planner.build(dict(decision), snapshot)
+        except ValueError as exc:
+            # The planner refuses when a card it was told to play is not visible
+            # or the button it needs is gone. Both mean the frame moved on, so
+            # waiting for a fresh one is the only safe answer.
+            return TurnOutcome(
+                snapshot, state,
+                {"action": ActionKind.WAIT.value, "reason": f"unplannable: {exc}"},
+                None, result.failures,
+            )
+        return TurnOutcome(snapshot, state, decision, plan, result.failures)
+
+    def _with_turn_owner(
+        self, snapshot: PerceptionSnapshot, image: np.ndarray
+    ) -> PerceptionSnapshot:
+        """Attach turn ownership, confirming our own turn with a second signal.
+
+        The repository's hybrid detector confirms the avatar highlight against a
+        card-count delta, which needs the opponents' counts read from the screen -
+        the bot does not read them yet. The action buttons are a better witness
+        and are already detected: measured over 221 frames, an action button is
+        visible on 111 and the gold ring picks SELF on 107 of those, while on the
+        110 frames with no button the ring picks another seat 94 times and SELF
+        only 4. Requiring both removes those 4.
+
+        A ring on another seat is reported as-is; it never triggers an action, so
+        a second witness would buy nothing.
+        """
+        detection = self.highlight.detect(image)
+        owner = detection.owner
+        if owner is SeatPosition.SELF and not any(
+            button.is_visible and button.button_id in ACTION_BUTTONS
+            for button in snapshot.buttons
+        ):
+            owner = None
+
+        evidence = None
+        if owner is not None and detection.roi is not None:
+            actionable = [
+                button.button_id.value
+                for button in snapshot.buttons
+                if button.is_visible and button.button_id in ACTION_BUTTONS
+            ]
+            evidence = TurnOwnerEvidence(
+                primary_signal=TurnPrimarySignal.AVATAR_HIGHLIGHT,
+                primary_roi=detection.roi,
+                primary_confidence=detection.confidence,
+                secondary_confidence=1.0 if actionable else 0.0,
+                signals_agree=owner is not SeatPosition.SELF or bool(actionable),
+                notes=f"ring={owner.name};buttons={','.join(actionable) or 'none'}",
+            )
+        # Confidence is left as the pipeline computed it: the turn signals are a
+        # gate on acting, not evidence about how well the cards were read.
+        return replace(snapshot, turn_owner=owner, turn_owner_evidence=evidence)

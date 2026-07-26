@@ -87,7 +87,8 @@ def describe(path: Path) -> int:
     )
     table = sorted((c for c in cards if c.zone is CardZone.TABLE), key=lambda c: c.roi.x)
     white = reader._white_mask(image)
-    print(f"o bai tay tim thay : {len(reader._hand_boxes(image, white))}")
+    hand_boxes, _components = reader._hand_boxes(image, white)
+    print(f"o bai tay tim thay : {len(hand_boxes)}")
     print(f"tay doc duoc  ({len(hand)}): {[c.code for c in hand]}")
     print(f"ban doc duoc  ({len(table)}): {[c.code for c in table]}")
 
@@ -107,11 +108,18 @@ def describe(path: Path) -> int:
     owner = highlight.owner.name if highlight.owner is not None else "khong ro"
     print(f"vien vang    : {owner} (tin cay {highlight.confidence:.2f})")
 
+    auto = next((s for s in visible if s.button_id is ButtonId.CANCEL_AUTO), None)
+    if auto is not None:
+        centre = (auto.roi.x + auto.roi.width // 2, auto.roi.y + auto.roi.height // 2)
+        print(f"!! DANG TU DANH - bam Huy tu dong tai {centre} de lay lai luot")
+        return 0
+
     play = next(
         (s for s in visible if s.button_id is ButtonId.PLAY),
         None,
     )
-    my_turn = highlight.owner is SeatPosition.SELF and bool(visible)
+    actionable = [s for s in visible if s.button_id in (ButtonId.PLAY, ButtonId.PASS)]
+    my_turn = highlight.owner is SeatPosition.SELF and bool(actionable)
     print(f"=> luot cua bot: {my_turn}" + ("" if play is None else f" (nut Danh bat={play.is_enabled})"))
     return 0
 
