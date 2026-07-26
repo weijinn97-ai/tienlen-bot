@@ -45,21 +45,39 @@ turn be replayed against recorded frames with no emulator attached.
 
 ## 3. The turn gate
 
-Acting off-turn is worse than not acting, so ownership needs two signals.
+**The action buttons decide. The gold ring may only veto.**
 
-The repository's `HybridTurnOwnerDetector` confirms the avatar highlight against
-a card-count delta, which needs the opponents' counts read off the screen — the
-bot does not read them yet. The action buttons are a better witness and are
-already detected. Measured over 221 frames:
+The game shows "Đánh" or "Bỏ Lượt" only on the player's own turn, which makes
+them the strongest signal available. The repository's `HybridTurnOwnerDetector`
+instead confirms the avatar highlight against a card-count delta, which needs the
+opponents' counts read off the screen — the bot does not read them yet.
 
-| | ring picks SELF | ring picks another seat | ring undecided |
-|---|---|---|---|
-| an action button is visible (111) | **107** | 1 | 3 |
-| no action button (110) | 4 | 94 | 12 |
+Measured over 582 frames (221 staged, 361 live):
 
-Requiring both removes the 4 frames where the ring alone would have acted
-off-turn. A ring on another seat is reported as-is and never triggers an action,
-so a second witness there would buy nothing.
+| gate | frames judged to be our turn |
+|---|---|
+| ring says SELF **and** a button is visible | 107 |
+| a button is visible | 165 |
+| **a button is visible, unless the ring names another seat** | **164** |
+
+| | count | consequence |
+|---|---|---|
+| button visible, ring undecided | **57** | requiring the ring forfeits these |
+| button visible, ring names another seat | 1 | the veto, and its whole value |
+| ring says SELF, no button | 5 | not our turn; all three gates block |
+
+### Correction
+
+The first version of this module required both signals. That was measured on the
+221 staged frames alone, where the ring is reliable; across the live corpus it is
+undecided on **57 of the 165 frames that show an action button**, so the
+conjunctive gate forfeited about **35% of the bot's turns**. A forfeited turn is
+auto-played — the exact failure this loop exists to prevent. The defect was found
+by running the loop live: it sat still on a frame where both "Đánh" and "Bỏ Lượt"
+were visible and enabled.
+
+The ring's remaining job is the veto, worth 1 frame in 582. It is kept because it
+costs nothing and guards against a stale or transitional button.
 
 ## 4. Auto-play recovery
 
@@ -85,24 +103,24 @@ button was gone on the next frame — the turn was taken back.
 
 | | |
 |---|---|
-| Frames judged to be the bot's turn | 107 (24.5%) |
+| Frames judged to be the bot's turn | 164 (37.6%) |
 | Frames in auto-play, recovery offered | 76 |
-| Complete tap plans built and executed against a recording controller | 46 |
-| Taps per plan | 1.70 mean, 5 max |
+| Complete tap plans built and executed against a recording controller | 62 |
+| Taps per plan | 1.97 mean, 5 max |
 | **Plans naming a card the hand does not hold** | **0** |
-| Latency p50 / p95 | 52.3 ms / 69.3 ms (0.58% of the 12 s turn budget) |
+| Latency p50 / p95 | 50.7 ms / 68.9 ms (0.57% of the 12 s turn budget) |
 
 Where frames stop:
 
 | Reason | Frames |
 |---|---|
-| `not_my_turn` | 253 |
+| `not_my_turn` | 218 |
 | `auto_play_engaged` | 76 |
-| `lead_single` (acted) | 42 |
-| `invalid_target_combo` | 34 |
+| `lead_single` (acted) | 69 |
+| `invalid_target_combo` | 41 |
 | `no_legal_response` (passed) | 17 |
 | `unplannable` | 8 |
-| `respond_single` / `respond_four_of_a_kind` (acted) | 6 |
+| `respond_single` / `respond_straight` / `respond_four_of_a_kind` (acted) | 13 |
 
 ## 6. Running it against a live emulator
 
@@ -126,11 +144,11 @@ Windows-side and HWND-bound.
 
 ## 7. Known limits
 
-- **`invalid_target_combo`, 34 frames.** The table cards that were read do not
+- **`invalid_target_combo`, 41 frames.** The table cards that were read do not
   form a legal Tien Len combo, so the bot cannot judge what it must beat and
   waits. This is downstream of table recall (80.4%), not a rules bug: a partial
   read of a five-card straight is not a combo.
-- **19 frames needed a re-read before the final tap.** `ActionPlanBuilder`
+- **20 frames needed a re-read before the final tap.** `ActionPlanBuilder`
   accepts a disabled "Đánh" button because selecting cards is what enables it,
   while `ActionTapExecutor` insists it be enabled. On a live bot the
   `refresh_snapshot` hook closes that gap; offline there is no second frame, so

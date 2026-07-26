@@ -92,14 +92,24 @@ class TurnLoopTests(unittest.TestCase):
         self.assertTrue(set(outcome.plan.cards) <= set(HAND))
 
     def test_the_highlight_alone_is_not_enough(self) -> None:
-        """The gold ring reads SELF on 4 of 110 frames where no action button is
+        """The gold ring reads SELF on 5 of 582 frames where no action button is
         shown, so acting on it alone would act off-turn."""
         outcome = build(SeatPosition.SELF, Buttons()).step(make_frame())
         self.assertFalse(outcome.is_my_turn)
         self.assertEqual(outcome.decision["reason"], "not_my_turn")
         self.assertIsNone(outcome.plan)
 
-    def test_another_seats_turn_never_acts(self) -> None:
+    def test_an_undecided_ring_does_not_forfeit_the_turn(self) -> None:
+        """The ring is undecided on 57 of the 165 frames that show an action
+        button. Requiring it would forfeit 35% of the bot's turns, and a
+        forfeited turn is auto-played - the failure this loop exists to prevent.
+        """
+        outcome = build(None, Buttons(play_button())).step(make_frame())
+        self.assertTrue(outcome.is_my_turn)
+        self.assertEqual(outcome.decision["action"], ActionKind.PLAY.value)
+
+    def test_a_ring_on_another_seat_still_vetoes(self) -> None:
+        """The one case where the button can be stale or transitional."""
         outcome = build(SeatPosition.LEFT, Buttons(play_button())).step(make_frame())
         self.assertFalse(outcome.is_my_turn)
         self.assertIsNone(outcome.plan)
