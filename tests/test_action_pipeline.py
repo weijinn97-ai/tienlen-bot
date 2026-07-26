@@ -96,3 +96,22 @@ class SkipSelectionTests(unittest.TestCase):
         taps = ActionTapExecutor(controller).execute(plan, state, skip_selection=True)
         self.assertEqual([t.target for t in taps], [str(ButtonId.PLAY)])
         self.assertEqual(len(controller.taps), 1)
+
+
+class ConfirmTapTests(unittest.TestCase):
+    """A tap that did not register is retried once, at the source."""
+
+    def test_a_tap_that_did_not_register_is_repeated(self) -> None:
+        state = snapshot()
+        plan = ActionPlanBuilder().build({"action": "play", "cards": ["3S"]}, state)
+        controller = StubController()
+        ActionTapExecutor(controller, confirm_tap=lambda roi: False).execute(plan, state)
+        # The card is tapped, seen not to have changed, tapped again, then the button.
+        self.assertEqual(controller.taps, [(130, 650), (130, 650), (1060, 630)])
+
+    def test_a_tap_that_registered_is_not_repeated(self) -> None:
+        state = snapshot()
+        plan = ActionPlanBuilder().build({"action": "play", "cards": ["3S"]}, state)
+        controller = StubController()
+        ActionTapExecutor(controller, confirm_tap=lambda roi: True).execute(plan, state)
+        self.assertEqual(controller.taps, [(130, 650), (1060, 630)])

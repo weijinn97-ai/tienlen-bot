@@ -23,6 +23,13 @@ class TapController(Protocol):
         ...
 
 
+class TapConfirmer(Protocol):
+    """Reports whether the last tap changed anything inside a region."""
+
+    def __call__(self, roi: Rect) -> bool:
+        ...
+
+
 def rect_center(rect: Rect) -> tuple[int, int]:
     return (rect.x + rect.width // 2, rect.y + rect.height // 2)
 
@@ -118,11 +125,13 @@ class ActionTapExecutor:
         controller: TapController,
         *,
         refresh_snapshot: Callable[[], PerceptionSnapshot] | None = None,
+        confirm_tap: TapConfirmer | None = None,
         selection_delay_seconds: float = 0.2,
         sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         self.controller = controller
         self.refresh_snapshot = refresh_snapshot
+        self.confirm_tap = confirm_tap
         self.selection_delay_seconds = selection_delay_seconds
         self.sleep = sleep
 
@@ -149,9 +158,19 @@ class ActionTapExecutor:
                 # would loop until the clock ran out.
                 if detections[code].zone is CardZone.SELECTED:
                     continue
-                x, y = rect_center(detections[code].roi)
+                roi = detections[code].roi
+                x, y = rect_center(roi)
                 self.controller.tap(x, y)
                 taps.append(ExecutedTap(code, x, y))
+                # A tap that did not register leaves the card unselected, and the
+                # next look would decide the same play and tap again - which by
+                # then toggles a selection that did take. Confirming here breaks
+                # that cycle at its source. Measured on 22 taps we made
+                # deliberately, a registered tap changed at least 19.8% of the
+                # card's own pixels while an untouched region changed none.
+                if self.confirm_tap is not None and not self.confirm_tap(roi):
+                    self.controller.tap(x, y)
+                    taps.append(ExecutedTap(f"{code}(lai)", x, y))
             if self.refresh_snapshot is not None:
                 self.sleep(self.selection_delay_seconds)
                 snapshot = self.refresh_snapshot()

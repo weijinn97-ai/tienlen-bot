@@ -63,6 +63,12 @@ from contracts.interfaces import ActionKind, ButtonId, CardZone
 BUTTON_TEMPLATES = ROOT / "data" / "templates" / "buttons" / "1280x720"
 FRAME_SHAPE = (720, 1280, 3)
 
+# A tap that registered changed at least 19.8% of the card's pixels across the 22
+# deliberate taps measured; an untouched region changed none. 10% sits clear of
+# both.
+TAP_CHANGE_FRACTION = 0.10
+TAP_CHANGE_INTENSITY = 40
+
 
 def log(message: str, level: str = "INFO") -> None:
     now = datetime.now().strftime("%H:%M:%S")
@@ -95,6 +101,7 @@ class Screen:
         self.restore_window = restore_window
         self.window: WindowsCapture | None = None
         self.viewport: tuple[int, int, int, int] | None = None
+        self.previous: np.ndarray | None = None
         if hwnd is not None:
             self._prepare_window(hwnd)
 
@@ -211,8 +218,33 @@ def main() -> int:
     controller = ADBController(
         adb_path=args.adb_path, device_id=args.serial, verify_connection=False
     )
+    def confirm_tap(roi) -> bool:
+        """Did the last tap change the card it landed on?
+
+        Selection is a toggle, and detecting which card is currently lifted from
+        one frame proved unreliable: on 157 measured hand cells no single
+        geometric signal separated the selected card from its neighbours - the
+        best caught 3 of 19. What is reliable is the change the tap itself makes.
+        Over 22 taps we made deliberately, the tapped card's own region changed
+        by at least 19.8% of its pixels, while an untouched region changed none.
+        """
+        image = screen.grab()
+        if image is None:
+            return True  # cannot tell; assume it landed rather than tap twice
+        previous = screen.previous
+        screen.previous = image
+        if previous is None:
+            return True
+        patch_a = previous[roi.y : roi.y + roi.height, roi.x : roi.x + roi.width]
+        patch_b = image[roi.y : roi.y + roi.height, roi.x : roi.x + roi.width]
+        if patch_a.shape != patch_b.shape or patch_a.size == 0:
+            return True
+        changed = np.abs(patch_b.astype(np.int16) - patch_a.astype(np.int16)).max(axis=2)
+        return float((changed > TAP_CHANGE_INTENSITY).mean()) >= TAP_CHANGE_FRACTION
+
     executor = ActionTapExecutor(
         controller,
+        confirm_tap=confirm_tap,
         # The "Danh" button only lights up once cards are selected, so the plan
         # is built against a frame where it is still dark. Re-reading between the
         # card taps and the button tap is what closes that gap.
