@@ -71,18 +71,24 @@ MAX_RANK_DISTANCE = 0.20
 MIN_SUIT_MARGIN = 0.015
 MAX_SUIT_DISTANCE = 0.32
 
-# The hand zone needs a stricter suit margin than the table. Deskewing leaves
-# more residual variation in the suit glyph, and at the table's 0.015 the hand
-# reads 91.7% precision with 6.2% of hands coming back out of sort order. Swept:
-# 0.09 is the first value giving 100% precision and zero order violations across
-# 147 frames. It costs recall - 59.5% down to 32.4% - which is the intended
-# direction of that trade, but see the module docstring: hand recall is not yet
-# good enough to drive play.
-MIN_SUIT_MARGIN_HAND = 0.09
+# Hand ranks are cut tighter than table ranks. Deskewing leaves residual blur, so
+# a loose gate lets warped glyphs through: at 0.20 the labelled accuracy is
+# unchanged but 9.5% of hands come back out of sort order, which is proof of
+# error. 0.17 holds precision and recall exactly while dropping that to 0.5%, and
+# tightening further only costs cards without fixing the last violation.
+MAX_HAND_RANK_DISTANCE = 0.17
 
 RED_SUITS = frozenset({"D", "H"})
 MIN_RED_DOMINANCE = 25.0
 MIN_INK_PIXELS = 25
+
+# Suit-by-outline thresholds. Measured on the labelled hand set: diamonds sit at
+# solidity 0.973-0.998, hearts 0.905-0.936, spades 0.874-0.973, clubs 0.811-0.893.
+MIN_SUIT_AREA = 50.0
+MIN_DEFECT_DEPTH = 3.0
+CLUB_MIN_DEFECTS = 3
+SOLIDITY_DIAMOND = 0.955
+SOLIDITY_CLUB_MAX = 0.860
 
 
 class CardReaderError(RuntimeError):
@@ -118,6 +124,59 @@ def _normalise_glyph(crop: np.ndarray) -> np.ndarray | None:
     tight = ink[ys.min() : ys.max() + 1, xs.min() : xs.max() + 1]
     resized = cv2.resize(tight, GLYPH_SIZE, interpolation=cv2.INTER_AREA)
     return resized.astype(np.float32) / 255.0
+
+
+def _suit_by_shape(crop: np.ndarray) -> str | None:
+    """Identify a suit from its outline rather than by template matching.
+
+    The four pips differ in convexity, and that is a far stronger signal than
+    the normalised bitmap: matching the bitmap confuses hearts with diamonds and
+    clubs with spades, scoring 81.1% on the labelled hand set, because resizing a
+    near-square pip into the rank glyph box washes the shapes together.
+
+    Counting convex-hull defects instead separates them by construction - a club
+    has three lobes, a diamond is convex, a heart has one notch, a spade has a
+    stem. Measured over the labelled hand cards:
+
+        diamond  0 defects (4/4)      heart  1 defect  (10/10)
+        spade    0 or 2 defects       club   3 or 4 defects (6/6)
+
+    Colour has already split red from black, so only D-vs-H and S-vs-C remain,
+    and the defect count decides both without overlap: 37/37, against 30/37 for
+    the bitmap. Solidity is kept as a guard so an unexpected shape is refused
+    rather than forced into the nearest class.
+    """
+    grey = cv2.cvtColor(crop, cv2.COLOR_BGR2GRAY)
+    _, ink = cv2.threshold(grey, INK_THRESHOLD, 255, cv2.THRESH_BINARY_INV)
+    contours, _ = cv2.findContours(ink, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if not contours:
+        return None
+    contour = max(contours, key=cv2.contourArea)
+    area = cv2.contourArea(contour)
+    if area < MIN_SUIT_AREA:
+        return None
+    hull_area = cv2.contourArea(cv2.convexHull(contour))
+    if hull_area <= 0:
+        return None
+    solidity = area / hull_area
+
+    try:
+        defects = cv2.convexityDefects(contour, cv2.convexHull(contour, returnPoints=False))
+    except cv2.error:
+        return None
+    depth = 0 if defects is None else int((defects[:, 0, 3] / 256.0 > MIN_DEFECT_DEPTH).sum())
+
+    if _is_red(crop):
+        if depth == 0 and solidity > SOLIDITY_DIAMOND:
+            return "D"
+        if depth == 1 and solidity < SOLIDITY_DIAMOND:
+            return "H"
+        return None
+    if depth >= CLUB_MIN_DEFECTS:
+        return "C"
+    if depth <= 2 and solidity > SOLIDITY_CLUB_MAX:
+        return "S"
+    return None
 
 
 def _is_red(crop: np.ndarray) -> bool:
@@ -255,10 +314,22 @@ class CardReader:
             if crop.size == 0:
                 return None
             crops.append(crop)
-        return self._decide(
-            crops[0], crops[1], self._hand_ranks, self._hand_suits,
-            suit_margin=MIN_SUIT_MARGIN_HAND,
-        )
+        return self._decide_hand(crops[0], crops[1])
+
+    def _decide_hand(self, rank_crop, suit_crop) -> tuple[str, float] | None:
+        rank_glyph = _normalise_glyph(rank_crop)
+        if rank_glyph is None:
+            return None
+        rank, rank_distance, runner_up = self._match(self._hand_ranks, rank_glyph)
+        if rank is None or rank_distance > MAX_HAND_RANK_DISTANCE:
+            return None
+        suit = _suit_by_shape(suit_crop)
+        if suit is None:
+            return None
+        margin = max(0.0, runner_up - rank_distance)
+        quality = max(0.0, 1.0 - rank_distance)
+        confidence = min(1.0, quality * (0.5 + min(1.0, margin * 8.0)))
+        return f"{rank}{suit}", float(confidence)
 
     def _card_boxes(self, image: np.ndarray) -> list[tuple[int, int, int, int]]:
         grey = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)

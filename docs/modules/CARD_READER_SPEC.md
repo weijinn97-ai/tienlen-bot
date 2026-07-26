@@ -1,6 +1,6 @@
 # Card Reader Module — Interface Specification
 
-Status: `IMPLEMENTED — table zone usable, hand zone precision-only`
+Status: `IMPLEMENTED — both zones read`
 Owner-authorised: CUDA torch install, GTX 1650 reference device, per-machine device selection.
 
 This document is the contract other agents work against. It defines the module
@@ -156,27 +156,48 @@ corpus rather than a sample. It was 26.16% before thresholding and is now zero.
 
 | Metric | Value |
 |---|---|
-| Precision (37 transcribed hand cards) | **100.0%** (12 correct, 0 wrong) |
-| Recall | **32.4%** |
+| Precision (37 transcribed hand cards) | **100.0%** (28 correct, 0 wrong) |
+| Recall | **75.7%** |
 
 Label-free check, using the fact that the game displays a hand sorted by Tien Len
 strength — any hand returned out of order is provably wrong:
 
 | Metric | Value |
 |---|---|
-| Frames with hand cards | 147 |
-| **Hands returned out of sort order** | **0 (0.0%)** |
+| Frames with hand cards | 192 |
+| **Hands returned out of sort order** | **1 (0.5%)** |
 | Frames with a duplicate hand card | 0 |
+| Cards read per frame | 5.5 |
 
-The hand zone uses a stricter suit margin than the table (0.09 vs 0.015). At the
-table's value the hand reads 91.7% precision with 6.2% of hands out of order;
-0.09 is the first value reaching 100% precision and zero order violations, at the
-cost of recall falling from 59.5% to 32.4%.
+### Suits are read by outline, not by bitmap
 
-**Hand recall is not good enough to drive play.** At 32.4% the bot sees roughly 2
-of its 13 cards. It cannot choose a move from that. Raising hand recall while
-holding precision is the next piece of work, and it needs better hand suit
-templates rather than more frames.
+Matching the normalised suit bitmap scores only **81.1%** on the labelled hand
+set, confusing hearts with diamonds and clubs with spades. Resizing a near-square
+pip into the rank glyph box washes the shapes together, and no confidence
+threshold separates the errors: wrong predictions reach margins of 0.23, higher
+than many correct ones.
+
+Convex-hull defect counting separates them by construction instead — a club has
+three lobes, a diamond is convex, a heart has one notch, a spade has a stem:
+
+| Suit | Solidity | Hull defects |
+|---|---|---|
+| Diamond | 0.973–0.998 | 0 |
+| Heart | 0.905–0.936 | 1 |
+| Spade | 0.874–0.973 | 0 or 2 |
+| Club | 0.811–0.893 | 3 or 4 |
+
+Colour already splits red from black, so only D-vs-H and S-vs-C remain, and the
+defect count decides both with no overlap: **37/37** against 30/37 for the
+bitmap. Solidity is retained as a guard so an unexpected outline is refused
+rather than forced into the nearest class.
+
+This lifted hand recall from 32.4% to 75.7% at unchanged precision.
+
+The hand rank gate is tighter than the table's (0.17 vs 0.20). Deskewing leaves
+residual blur, and at 0.20 the labelled accuracy is identical but 9.5% of hands
+come back out of sort order; 0.17 drops that to 0.5% while costing no labelled
+accuracy at all.
 
 ### Gates not yet met
 
