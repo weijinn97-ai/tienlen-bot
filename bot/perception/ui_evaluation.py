@@ -317,9 +317,10 @@ def _validate_path(rel_path: str, base: Path, resolved_paths: dict[str, str]) ->
         raise ValueError(f"Invalid path traversal: {rel_path}")
 
     try:
-        full_path = (base / rel_path).resolve(strict=True)
-    except FileNotFoundError:
-        raise ValueError(f"File not found: {rel_path}")
+        # Resolve the canonical target even when the final file is missing so
+        # an escaping symlink is rejected as an escape, not hidden behind a
+        # misleading "not found" result.
+        full_path = (base / rel_path).resolve(strict=False)
     except RuntimeError:
         raise ValueError(f"Symlink loop or error resolving: {rel_path}")
 
@@ -328,6 +329,9 @@ def _validate_path(rel_path: str, base: Path, resolved_paths: dict[str, str]) ->
         full_path.relative_to(base.resolve())
     except ValueError:
         raise ValueError(f"Escape path detected: {rel_path}")
+
+    if not full_path.is_file():
+        raise ValueError(f"File not found: {rel_path}")
 
     canonical = str(full_path).lower()
     if canonical in resolved_paths and resolved_paths[canonical] != rel_path:
@@ -385,18 +389,28 @@ def load_ui_evaluation_bundle(bundle_dir: str) -> UiEvaluationBundle:
     if len(set(files_dict.values())) != 3:
         raise ValueError("files paths must be distinct")
 
+    # Resolve and contain every path before trusting manifest cross-references.
+    # Otherwise a malicious symlink can be masked by an unrelated sha256-key
+    # mismatch and never reach the canonical containment check.
+    resolved_paths: dict[str, str] = {}
+    resolved_files: dict[str, Path] = {}
+    for key, expected_filename in files_dict.items():
+        _require_type(expected_filename, str, f"files.{key}")
+        resolved_files[key] = _validate_path(
+            expected_filename,
+            base,
+            resolved_paths,
+        )
+
     sha256_dict = _require_type(b["sha256"], dict, "sha256")
     if set(files_dict.values()) != set(sha256_dict.keys()):
         raise ValueError("sha256 keys must exactly match files values")
-
-    resolved_paths: dict[str, str] = {}
 
     loaded_data = {}
     input_sha256 = {"bundle.json": bundle_sha}
 
     for key, expected_filename in files_dict.items():
-        _require_type(expected_filename, str, f"files.{key}")
-        file_path = _validate_path(expected_filename, base, resolved_paths)
+        file_path = resolved_files[key]
 
         expected_sha = sha256_dict[expected_filename]
         if type(expected_sha) is not str or not _is_valid_hex(expected_sha, 64):

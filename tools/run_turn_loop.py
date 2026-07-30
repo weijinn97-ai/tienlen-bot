@@ -52,6 +52,7 @@ if str(ROOT) not in sys.path:
 
 from bot.actions.action_pipeline import ActionTapExecutor
 from bot.actions.adb_controller import ADBController
+from bot.actions.verification import PostActionVerifier
 from bot.capture.windows_capture import WindowsCapture
 from bot.perception.buttons import load_gameplay_button_detector
 from bot.perception.card_reader import CardReader
@@ -69,8 +70,10 @@ FRAME_SHAPE = (720, 1280, 3)
 TAP_CHANGE_FRACTION = 0.10
 TAP_CHANGE_INTENSITY = 40
 
-# How long to let the game act on a play before deciding it was refused.
-REFUSAL_CHECK_SECONDS = 0.6
+# Tap confirmation is polled because the emulator does not redraw
+# synchronously with the ADB command.
+TAP_CONFIRM_TIMEOUT_SECONDS = 0.45
+TAP_CONFIRM_POLL_SECONDS = 0.05
 
 
 def log(message: str, level: str = "INFO") -> None:
@@ -101,6 +104,8 @@ class Screen:
     ) -> None:
         self.adb_path = adb_path
         self.serial = serial
+        self.hwnd = hwnd or 0
+        self.bot_id = "dry-run"
         self.restore_window = restore_window
         self.window: WindowsCapture | None = None
         self.viewport: tuple[int, int, int, int] | None = None
@@ -177,6 +182,14 @@ class Screen:
                 self.window = None
         return self.grab_device()
 
+    @property
+    def source(self) -> CaptureSource:
+        return (
+            CaptureSource.WINDOW_RECT
+            if self.window is not None
+            else CaptureSource.ADB_EXEC_OUT
+        )
+
 
 def hand_cell_count(snapshot) -> int:
     """How many cards are in the fan, whether or not the reader could name them."""
@@ -184,24 +197,6 @@ def hand_cell_count(snapshot) -> int:
         1 for card in snapshot.cards
         if card.zone in (CardZone.MY_HAND, CardZone.SELECTED)
     )
-
-
-def give_up_turn(controller, outcome) -> None:
-    """Clear any selection and pass, so a refused play costs a turn not a round."""
-    for card in outcome.snapshot.cards:
-        if card.zone is CardZone.SELECTED:
-            controller.tap(
-                card.roi.x + card.roi.width // 2, card.roi.y + card.roi.height // 2
-            )
-    passer = next(
-        (b for b in outcome.snapshot.buttons
-         if b.button_id is ButtonId.PASS and b.is_visible and b.is_enabled),
-        None,
-    )
-    if passer is not None:
-        controller.tap(
-            passer.roi.x + passer.roi.width // 2, passer.roi.y + passer.roi.height // 2
-        )
 
 
 def describe(outcome) -> str:
@@ -218,6 +213,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--serial", required=True)
     parser.add_argument("--adb-path", default="adb")
+    parser.add_argument(
+        "--memuc-path",
+        default=r"C:\Microvirt\MEmu\memuc.exe",
+        help="duong dan memuc.exe, dung de khoa serial va HWND vao cung mot may ao",
+    )
     parser.add_argument("--interval", type=float, default=0.3)
     parser.add_argument("--max-steps", type=int, default=200)
     parser.add_argument(
@@ -238,10 +238,43 @@ def main() -> int:
     )
     args = parser.parse_args()
 
+    binding = None
+    if args.act:
+        if args.hwnd is None:
+            parser.error("--act requires --hwnd; ADB capture is not allowed in the action hot path")
+        try:
+            from bot.discovery.adb_discovery import scan_memu_adb_bindings
+
+            candidates = scan_memu_adb_bindings(
+                adb_path=args.adb_path,
+                memuc_path=Path(args.memuc_path),
+            )
+        except Exception as exc:
+            parser.error(f"khong xac minh duoc MEmu binding: {exc}")
+        matches = [
+            candidate
+            for candidate in candidates
+            if candidate.hwnd == args.hwnd
+            and candidate.adb_serial == args.serial
+            and candidate.process_id > 0
+        ]
+        if len(matches) != 1:
+            parser.error(
+                "--serial va --hwnd khong anh xa duy nhat toi cung mot MEmu dang chay"
+            )
+        binding = matches[0]
+
     screen = Screen(
         args.adb_path, args.serial, args.hwnd,
         restore_window=not args.no_restore_window,
     )
+    if binding is not None:
+        screen.bot_id = f"memu-{binding.vm_index}"
+        screen.hwnd = binding.hwnd or 0
+    if args.act and screen.window is None:
+        parser.error(
+            "--act requires a working HWND capture path; refusing ADB screencap hot path"
+        )
     loop = TurnLoop(
         PerceptionPipeline(
             PerceptionAdapters(
@@ -272,25 +305,47 @@ def main() -> int:
         """
         reference = screen.reference
         if reference is None:
-            return True
+            return False
+        deadline = time.monotonic() + TAP_CONFIRM_TIMEOUT_SECONDS
+        while time.monotonic() < deadline:
+            image = screen.grab()
+            if image is None:
+                time.sleep(TAP_CONFIRM_POLL_SECONDS)
+                continue
+            patch_a = reference[roi.y : roi.y + roi.height, roi.x : roi.x + roi.width]
+            patch_b = image[roi.y : roi.y + roi.height, roi.x : roi.x + roi.width]
+            if patch_a.shape != patch_b.shape or patch_a.size == 0:
+                return False
+            changed = np.abs(
+                patch_b.astype(np.int16) - patch_a.astype(np.int16)
+            ).max(axis=2)
+            if float((changed > TAP_CHANGE_INTENSITY).mean()) >= TAP_CHANGE_FRACTION:
+                # The next card tap must compare with the state after this tap,
+                # not with the original pre-selection frame.
+                screen.reference = image
+                return True
+            time.sleep(TAP_CONFIRM_POLL_SECONDS)
+        return False
+
+    before_commit_frame: list[np.ndarray | None] = [None]
+
+    def capture_before_commit() -> None:
         image = screen.grab()
         if image is None:
-            return True  # cannot tell; assume it landed rather than tap twice
-        patch_a = reference[roi.y : roi.y + roi.height, roi.x : roi.x + roi.width]
-        patch_b = image[roi.y : roi.y + roi.height, roi.x : roi.x + roi.width]
-        if patch_a.shape != patch_b.shape or patch_a.size == 0:
-            return True
-        changed = np.abs(patch_b.astype(np.int16) - patch_a.astype(np.int16)).max(axis=2)
-        return float((changed > TAP_CHANGE_INTENSITY).mean()) >= TAP_CHANGE_FRACTION
+            raise ValueError("khong chup duoc khung truoc khi bam nut hanh dong")
+        before_commit_frame[0] = image
+        screen.reference = image
 
     executor = ActionTapExecutor(
         controller,
         confirm_tap=confirm_tap,
+        before_commit=capture_before_commit,
         # The "Danh" button only lights up once cards are selected, so the plan
         # is built against a frame where it is still dark. Re-reading between the
         # card taps and the button tap is what closes that gap.
         refresh_snapshot=lambda: refresh(screen, loop),
     )
+    verifier = PostActionVerifier()
 
     stop = Event()
     signal.signal(signal.SIGINT, lambda *_: stop.set())
@@ -300,9 +355,8 @@ def main() -> int:
         f"| nhip={args.interval}s | toi_da={args.max_steps} buoc"
     )
 
-    acted = cancelled = read_failures = rounds = refused = 0
-    last_signature, repeats = None, 0
-    last_signature = None
+    acted = cancelled = read_failures = rounds = verification_failures = 0
+    diagnostic_signature, repeats = None, 0
     for step in range(args.max_steps):
         if stop.is_set():
             break
@@ -313,10 +367,7 @@ def main() -> int:
             time.sleep(args.interval)
             continue
 
-        frame = FrameEnvelope.create(
-            bot_id="live", hwnd=0, adb_serial=args.serial, image=image,
-            source=CaptureSource.WINDOWS_GRAPHICS_CAPTURE, sequence=step,
-        )
+        frame = make_frame(screen, image, sequence=step)
         started = time.perf_counter()
         outcome = loop.step(frame)
         elapsed = (time.perf_counter() - started) * 1000
@@ -326,8 +377,13 @@ def main() -> int:
             y = outcome.recovery.roi.y + outcome.recovery.roi.height // 2
             if args.act:
                 log(f"TU DANH dang bat -> bam Huy tu dong tai ({x},{y})", "WARN")
+                screen.reference = image
                 controller.tap(x, y)
-                cancelled += 1
+                if confirm_tap(outcome.recovery.roi):
+                    cancelled += 1
+                else:
+                    log("khong xac minh duoc nut Huy tu dong; dung fail-safe", "ERROR")
+                    break
             else:
                 log(f"TU DANH dang bat tai ({x},{y}) (chay thu: de nguyen)", "WARN")
             time.sleep(args.interval)
@@ -346,8 +402,13 @@ def main() -> int:
             y = ready.roi.y + ready.roi.height // 2
             if args.act:
                 log(f"het van -> bam Tiep Tuc tai ({x},{y})")
+                screen.reference = image
                 controller.tap(x, y)
-                rounds += 1
+                if confirm_tap(ready.roi):
+                    rounds += 1
+                else:
+                    log("khong xac minh duoc nut Tiep Tuc; dung fail-safe", "ERROR")
+                    break
             else:
                 log(f"het van, thay Tiep Tuc tai ({x},{y}) (chay thu: de nguyen)")
             time.sleep(args.interval)
@@ -366,8 +427,8 @@ def main() -> int:
         # take. Keeping the frame is the only way to find out why, because the
         # log records what the reader believed, not what was on screen.
         signature = (action, tuple(cards), describe(outcome))
-        repeats = repeats + 1 if signature == last_signature else 0
-        last_signature = signature
+        repeats = repeats + 1 if signature == diagnostic_signature else 0
+        diagnostic_signature = signature
         if args.dump_repeats and repeats in (2, 5, 10):
             directory = Path(args.dump_repeats)
             directory.mkdir(parents=True, exist_ok=True)
@@ -383,56 +444,50 @@ def main() -> int:
             time.sleep(args.interval)
             continue
 
-        # If the same decision comes back on an unchanged hand, the previous
-        # attempt did not land. Re-tapping the cards would toggle a selection
-        # that may already be correct, so press the button alone and let the
-        # game judge it.
-        signature = (tuple(outcome.plan.cards), describe(outcome))
-        repeated = signature == last_signature
-        last_signature = signature
         # Counting hand cells is the most dependable measurement available: the
         # boxes are found from the white mask alone, so they survive the reader
         # failing to name the cards. If a play went through, this number drops.
         cells = hand_cell_count(outcome.snapshot)
 
         screen.reference = image
+        before_commit_frame[0] = None
         try:
-            taps = executor.execute(
-                outcome.plan, outcome.snapshot, skip_selection=repeated
+            taps = executor.execute(outcome.plan, outcome.snapshot)
+            if outcome.plan.verify_spec is None or before_commit_frame[0] is None:
+                raise ValueError("hanh dong khong co du chung de xac minh sau tap")
+            verification = verifier.verify(
+                before_frame=before_commit_frame[0],
+                spec=outcome.plan.verify_spec,
+                capture_frame=lambda: require_frame(screen),
+                before_hand_count=cells,
+                parse_hand_count=lambda frame_image: parse_hand_count(
+                    screen, loop, frame_image, sequence=step
+                ),
             )
-            acted += 1
-            note = " (lap lai: chi bam nut)" if repeated else ""
-            log(f"   da bam {len(taps)} lan{note}: {[(t.target, t.x, t.y) for t in taps]}")
-        except ValueError as exc:
-            log(f"   khong thuc hien duoc: {exc}", "WARN")
-
-        # The game refuses a play that breaks the rules and says so on screen,
-        # but it says it in Vietnamese text over the fan; the count is easier to
-        # read and means the same thing. A refusal almost always means the table
-        # was misread - the bot believed it was leading and was not - so trying
-        # the same cards again cannot work, and repeating it is what burned whole
-        # rounds. Passing is always legal, ends the turn cleanly, and costs one
-        # turn instead of the round.
-        if args.act and outcome.plan is not None and outcome.plan.kind is ActionKind.PLAY:
-            time.sleep(REFUSAL_CHECK_SECONDS)
-            follow = screen.grab()
-            if follow is not None:
-                later = loop.step(
-                    FrameEnvelope.create(
-                        bot_id="live", hwnd=0, adb_serial=args.serial, image=follow,
-                        source=CaptureSource.WINDOWS_GRAPHICS_CAPTURE, sequence=step,
-                    )
+            if not verification.succeeded:
+                verification_failures += 1
+                log(
+                    "   khong xac minh duoc ket qua hanh dong "
+                    f"({verification.reason}); dung fail-safe",
+                    "ERROR",
                 )
-                if later.snapshot is not None and hand_cell_count(later.snapshot) >= cells:
-                    refused += 1
-                    log(f"   nuoc di bi tu choi (van {cells} o bai) -> bo luot", "WARN")
-                    give_up_turn(controller, later)
+                break
+            acted += 1
+            log(
+                f"   da xac minh {len(taps)} tap "
+                f"({verification.reason}): "
+                f"{[(t.target, t.x, t.y) for t in taps]}"
+            )
+        except (ValueError, RuntimeError) as exc:
+            verification_failures += 1
+            log(f"   khong thuc hien/xac minh duoc: {exc}; dung fail-safe", "ERROR")
+            break
 
         # No sleep here on purpose. The countdown is already running; if this
         # attempt did not land, the next look should happen inside the same turn.
 
     log(
-        f"Ket thuc | da danh={acted} | bi tu choi={refused} | "
+        f"Ket thuc | da danh={acted} | xac_minh_loi={verification_failures} | "
         f"da huy tu dong={cancelled} | van moi={rounds} | khung loi={read_failures}"
     )
     return 0
@@ -443,14 +498,42 @@ def refresh(screen: Screen, loop: TurnLoop):
     image = screen.grab()
     if image is None:
         raise ValueError("khong chup duoc khung hinh de doc lai")
-    frame = FrameEnvelope.create(
-        bot_id="live", hwnd=0, adb_serial=screen.serial, image=image,
-        source=CaptureSource.WINDOWS_GRAPHICS_CAPTURE, sequence=0,
-    )
+    frame = make_frame(screen, image, sequence=0)
     outcome = loop.step(frame)
     if outcome.snapshot is None:
         raise ValueError("khung doc lai khong hop le")
     return outcome.snapshot
+
+
+def make_frame(screen: Screen, image: np.ndarray, *, sequence: int) -> FrameEnvelope:
+    return FrameEnvelope.create(
+        bot_id=screen.bot_id,
+        hwnd=screen.hwnd,
+        adb_serial=screen.serial,
+        image=image,
+        source=screen.source,
+        sequence=sequence,
+    )
+
+
+def require_frame(screen: Screen) -> np.ndarray:
+    image = screen.grab()
+    if image is None:
+        raise RuntimeError("khong chup duoc khung hinh de xac minh hanh dong")
+    return image
+
+
+def parse_hand_count(
+    screen: Screen,
+    loop: TurnLoop,
+    image: np.ndarray,
+    *,
+    sequence: int,
+) -> int | None:
+    outcome = loop.step(make_frame(screen, image, sequence=sequence))
+    if outcome.snapshot is None:
+        return None
+    return hand_cell_count(outcome.snapshot)
 
 
 if __name__ == "__main__":

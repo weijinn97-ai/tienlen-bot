@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "updated": "2026-07-24",
+  "updated": "2026-07-30",
   "status_flow": ["PLANNED", "IN_PROGRESS", "CANDIDATE", "LOCKED", "DEPRECATED"],
   "modules": [
     {
@@ -36,16 +36,21 @@
       "paths": [
         "bot/perception/__init__.py",
         "bot/perception/buttons.py",
+        "bot/perception/card_reader.py",
+        "bot/perception/card_templates.npz",
         "bot/perception/fan_cards.py",
+        "bot/perception/hand_templates.npz",
         "bot/perception/ocr.py",
+        "bot/perception/pipeline.py",
         "bot/perception/turn_owner.py",
         "bot/perception/ui_evaluation.py",
+        "bot/perception/ui_inference_runner.py",
         "bot/perception/yolo_cards.py",
         "requirements-perception.txt",
         "data/templates/**"
       ],
       "public_api": ["bot.perception"],
-      "tests": ["tests/test_fan_cards.py", "tests/test_live_gameplay_perception.py", "tests/test_model_perception.py", "tests/test_ocr.py", "tests/test_turn_owner.py", "tests/test_perception_ui_evaluation.py"],
+      "tests": ["tests/test_card_reader.py", "tests/test_fan_cards.py", "tests/test_live_gameplay_perception.py", "tests/test_model_perception.py", "tests/test_ocr.py", "tests/test_perception_pipeline.py", "tests/test_turn_owner.py", "tests/test_perception_ui_evaluation.py", "tests/test_perception_ui_inference_runner.py"],
       "evidence": "docs/acceptance/perception-ui/0.3.0/",
       "blocked_by": ["MOD-CONTRACTS", "MOD-DISCOVERY-CAPTURE"]
     },
@@ -101,12 +106,14 @@
         "bot/runtime/__init__.py",
         "bot/runtime/bot_supervisor.py",
         "bot/runtime/bot_worker.py",
+        "bot/runtime/turn_loop.py",
         "bot/inference/**",
         "bot/stability/**",
+        "tools/run_turn_loop.py",
         "requirements-runtime.txt"
       ],
       "public_api": ["bot.runtime", "bot.inference", "bot.stability"],
-      "tests": ["tests/test_bot_worker_typed_state.py", "tests/test_supervisor.py"],
+      "tests": ["tests/test_bot_worker_typed_state.py", "tests/test_supervisor.py", "tests/test_turn_loop.py"],
       "evidence": "",
       "blocked_by": ["MOD-STATE", "MOD-RULES-DECISION", "MOD-ACTIONS"]
     },

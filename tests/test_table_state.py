@@ -89,6 +89,15 @@ class TableStateConsensusTests(unittest.TestCase):
         self.assertFalse(result.is_stable)
         self.assertIsNone(result.accepted_state)
 
+    def test_reset_discards_evidence_from_a_previous_turn(self) -> None:
+        consensus = self.make_consensus()
+        consensus.observe("bot-1", make_state("frame-1"))
+        consensus.observe("bot-1", make_state("frame-2"))
+        consensus.reset("bot-1")
+        result = consensus.observe("bot-1", make_state("frame-3"))
+        self.assertFalse(result.is_stable)
+        self.assertEqual(result.observed_frames, 1)
+
     def test_transition_state_uses_three_of_four_consensus(self) -> None:
         consensus = self.make_consensus()
         results = [

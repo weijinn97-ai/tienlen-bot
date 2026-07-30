@@ -24,7 +24,11 @@ _MEMUC_SERIAL_PATTERN = re.compile(
 )
 
 
-user32 = ctypes.WinDLL("user32", use_last_error=True)
+user32 = (
+    ctypes.WinDLL("user32", use_last_error=True)
+    if hasattr(ctypes, "WinDLL")
+    else None
+)
 
 
 @dataclass(frozen=True)
@@ -228,6 +232,8 @@ def resolve_memu_adb_identity(
 
 
 def enumerate_windows_by_pid(pid: int) -> list[WindowInfo]:
+    if user32 is None or not hasattr(ctypes, "WINFUNCTYPE"):
+        raise RuntimeError("Window enumeration is only available on Windows.")
     windows: list[WindowInfo] = []
 
     @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)

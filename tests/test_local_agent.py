@@ -23,6 +23,20 @@ class GameStateAdapterTests(unittest.TestCase):
         self.assertTrue(adapted["is_my_turn"])
         self.assertEqual(adapted["players_info"]["LEFT"]["cards_left"], 13)
 
+    def test_selected_cards_remain_part_of_the_agent_hand(self) -> None:
+        state = TableState(
+            frame_id="frame-1",
+            frame_ts=123,
+            confidence=0.9,
+            my_cards=("3S",),
+            selected_cards=("4D",),
+            turn_owner=SeatPosition.SELF,
+            game_phase=GamePhase.PLAYING,
+        )
+        adapted = GameStateAdapter().adapt_state(state)
+        self.assertEqual(adapted["my_hand"], ["3S", "4D"])
+        self.assertEqual(adapted["my_selected_cards"], ["4D"])
+
     def test_legacy_card_values_are_normalized_at_boundary(self) -> None:
         self.assertEqual(normalize_agent_card("A_hearts"), "AH")
         adapted = GameStateAdapter().adapt_state(

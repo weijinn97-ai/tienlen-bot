@@ -21,7 +21,7 @@ from bot.actions.action_pipeline import ActionPlanBuilder
 from bot.agent.game_state_adapter import GameStateAdapter
 from bot.agent.local_agent import LocalAgent
 from bot.perception.pipeline import PerceptionPipeline, PipelineFailure
-from bot.perception.table_state import TableStateAssembler
+from bot.perception.table_state import TableStateAssembler, TableStateConsensus
 from bot.perception.turn_owner import YellowHighlightDetector
 from bot.runtime.schemas import FrameEnvelope
 from contracts.interfaces import (
@@ -35,6 +35,7 @@ from contracts.interfaces import (
     TableState,
     TurnOwnerEvidence,
     TurnPrimarySignal,
+    TransitionEvent,
 )
 
 ACTION_BUTTONS = (ButtonId.PLAY, ButtonId.PASS)
@@ -79,6 +80,7 @@ class TurnLoop:
         *,
         highlight: YellowHighlightDetector | None = None,
         assembler: TableStateAssembler | None = None,
+        consensus: TableStateConsensus | None = None,
         adapter: GameStateAdapter | None = None,
         agent: LocalAgent | None = None,
         planner: ActionPlanBuilder | None = None,
@@ -86,6 +88,7 @@ class TurnLoop:
         self.pipeline = pipeline
         self.highlight = highlight or YellowHighlightDetector()
         self.assembler = assembler or TableStateAssembler()
+        self.consensus = consensus or TableStateConsensus()
         self.adapter = adapter or GameStateAdapter()
         self.agent = agent or LocalAgent()
         self.planner = planner or ActionPlanBuilder()
@@ -111,18 +114,47 @@ class TurnLoop:
             None,
         )
         if recovery is not None:
+            self.consensus.reset(snapshot.bot_id)
             return TurnOutcome(
                 snapshot, state,
                 {"action": ActionKind.WAIT.value, "reason": "auto_play_engaged"},
                 None, result.failures, recovery,
             )
 
+        if state.game_phase is not GamePhase.PLAYING:
+            self.consensus.reset(snapshot.bot_id)
+            return _waiting(
+                "game_phase_not_playing",
+                snapshot=snapshot,
+                state=state,
+                failures=result.failures,
+            )
+
         if state.turn_owner is not SeatPosition.SELF:
+            self.consensus.reset(snapshot.bot_id)
             return _waiting("not_my_turn", snapshot=snapshot, state=state, failures=result.failures)
 
-        decision = self.agent.decide_action(self.adapter.adapt_state(state))
+        consensus = self.consensus.observe(
+            snapshot.bot_id,
+            state,
+            transition=TransitionEvent.MY_TURN,
+        )
+        if not consensus.is_stable or consensus.accepted_state is None:
+            reason = consensus.rejection_reason or (
+                f"consensus_pending:{consensus.observed_frames}/"
+                f"{consensus.required_matches}"
+            )
+            return _waiting(
+                reason,
+                snapshot=snapshot,
+                state=state,
+                failures=result.failures,
+            )
+
+        stable_state = consensus.accepted_state
+        decision = self.agent.decide_action(self.adapter.adapt_state(stable_state))
         if decision.get("action") == ActionKind.WAIT.value:
-            return TurnOutcome(snapshot, state, decision, None, result.failures)
+            return TurnOutcome(snapshot, stable_state, decision, None, result.failures)
 
         try:
             plan = self.planner.build(dict(decision), snapshot)
@@ -135,7 +167,7 @@ class TurnLoop:
                 {"action": ActionKind.WAIT.value, "reason": f"unplannable: {exc}"},
                 None, result.failures,
             )
-        return TurnOutcome(snapshot, state, decision, plan, result.failures)
+        return TurnOutcome(snapshot, stable_state, decision, plan, result.failures)
 
     def _with_turn_owner(
         self, snapshot: PerceptionSnapshot, image: np.ndarray
