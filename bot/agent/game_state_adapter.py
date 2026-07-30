@@ -32,9 +32,15 @@ class GameStateAdapter:
     def adapt_state(self, raw_game_state: TableState | Mapping[str, Any]) -> dict[str, Any]:
         if isinstance(raw_game_state, TableState):
             combo = raw_game_state.last_played_combo
+            selected = list(raw_game_state.selected_cards)
+            # A selected card is lifted out of MY_HAND by perception, but it is
+            # still physically held and must remain available to the rules
+            # engine.  Dropping it here made a partially-selected hand look
+            # smaller and could produce an illegal or needlessly weak decision.
+            hand = list(dict.fromkeys((*raw_game_state.my_cards, *selected)))
             return {
-                "my_hand": list(raw_game_state.my_cards),
-                "my_selected_cards": list(raw_game_state.selected_cards),
+                "my_hand": hand,
+                "my_selected_cards": selected,
                 "last_played_cards": list(combo.cards) if combo else [],
                 "current_player_turn": (
                     raw_game_state.turn_owner.name if raw_game_state.turn_owner is not None else None
@@ -60,6 +66,9 @@ class GameStateAdapter:
             "selected_cards",
             raw_game_state.get("my_selected_cards", []),
         )
+        normalized_selected = [normalize_agent_card(card) for card in selected]
+        normalized_hand = [normalize_agent_card(card) for card in hand]
+        normalized_hand = list(dict.fromkeys((*normalized_hand, *normalized_selected)))
         last_combo = raw_game_state.get(
             "last_played_combo",
             raw_game_state.get("last_played_cards", []),
@@ -89,8 +98,8 @@ class GameStateAdapter:
                 for seat, count in raw_game_state.get("player_card_counts", {}).items()
             }
         return {
-            "my_hand": [normalize_agent_card(card) for card in hand],
-            "my_selected_cards": [normalize_agent_card(card) for card in selected],
+            "my_hand": normalized_hand,
+            "my_selected_cards": normalized_selected,
             "last_played_cards": [normalize_agent_card(card) for card in last_combo],
             "current_player_turn": turn_owner,
             "is_my_turn": is_my_turn,

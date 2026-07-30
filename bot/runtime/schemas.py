@@ -14,6 +14,7 @@ class CaptureSource(str, Enum):
     WINDOWS_GRAPHICS_CAPTURE = "windows_graphics_capture"
     DESKTOP_DUPLICATION = "desktop_duplication"
     WINDOW_RECT = "window_rect"
+    ADB_EXEC_OUT = "adb_exec_out"
 
 
 class CaptureMode(str, Enum):

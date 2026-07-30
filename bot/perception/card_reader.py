@@ -363,21 +363,43 @@ class CardReader:
 
         A tapped card rises clear of the fan. The fan itself is a smooth curve -
         adjacent cards differ by at most 9px in the observed hands - so a card
-        sitting well above both its neighbours is selected, not just further
-        along the arc. Comparing against neighbours rather than an absolute row
-        keeps this true wherever the fan sits on screen.
+        sitting well above the surrounding fan is selected, not just further
+        along the arc. Selected adjacent cards form one lifted plateau, so they
+        must be classified as a run; comparing every card only with its immediate
+        neighbour misses the entire plateau.
 
         Without this the bot re-taps a card it has already selected, which
         deselects it, and the turn loops until the clock runs out.
         """
         tops = [box[1] for box, _index in boxes]
-        flags = []
-        for position, top in enumerate(tops):
-            neighbours = tops[max(0, position - 1) : position] + tops[position + 1 : position + 2]
-            if not neighbours:
-                flags.append(False)
-                continue
-            flags.append(top + SELECTED_LIFT < min(neighbours))
+        flags = [False] * len(tops)
+        if len(tops) < 2:
+            return flags
+
+        # A normal fan is one smooth segment. A selection creates a jump of at
+        # least SELECTED_LIFT at each visible edge. Grouping between those jumps
+        # lets two or more neighbouring selected cards support each other
+        # instead of hiding each other's lift.
+        starts = [0]
+        starts.extend(
+            index
+            for index in range(1, len(tops))
+            if abs(tops[index] - tops[index - 1]) >= SELECTED_LIFT
+        )
+        starts.append(len(tops))
+        segments = [
+            (starts[index], starts[index + 1])
+            for index in range(len(starts) - 1)
+        ]
+        medians = [
+            float(np.median(tops[start:end]))
+            for start, end in segments
+        ]
+        for index, (start, end) in enumerate(segments):
+            neighbours = medians[max(0, index - 1) : index]
+            neighbours += medians[index + 1 : index + 2]
+            if neighbours and medians[index] + SELECTED_LIFT < min(neighbours):
+                flags[start:end] = [True] * (end - start)
         return flags
 
     @staticmethod

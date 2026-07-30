@@ -122,6 +122,7 @@ class TableStateConsensus:
         spec = self.transition_spec if transition is not None else self.regular_spec
         rejection_reason = self.policy.rejection_reason(state, now_ns=self.clock_ns())
         if rejection_reason is not None:
+            self._history[bot_id].clear()
             return TableStateConsensusResult(
                 is_stable=False,
                 accepted_state=None,
@@ -142,6 +143,12 @@ class TableStateConsensus:
             observed_frames=len(active_window),
             required_matches=spec.required_matches,
         )
+
+    def reset(self, bot_id: str) -> None:
+        """Discard prior evidence when a turn/round boundary is observed."""
+        if not bot_id.strip():
+            raise ValueError("bot_id must not be empty.")
+        self._history.pop(bot_id, None)
 
     @staticmethod
     def _semantic_key(state: TableState) -> str:

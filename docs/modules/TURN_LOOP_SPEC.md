@@ -169,6 +169,11 @@ Dry run reads the screen, decides, prints the decision and taps nothing. `--act`
 lets it play and wires `refresh_snapshot`, which is what closes the disabled-
 button gap in §6.
 
+`--act` additionally requires a valid `--hwnd`. At startup the runner resolves
+MEmu's process, HWND and ADB serial and refuses to act unless all three identify
+one unique running VM. It also refuses to fall back to ADB screencap in the
+action hot path.
+
 **Auto-play recovery follows `--act`, deliberately.** Taking the turn back and
 then not playing it just lets the clock run out and auto-play re-engage, one
 round poorer. Cancelling is only an improvement if something is going to play the
@@ -190,6 +195,19 @@ Windows-side and HWND-bound.
   `refresh_snapshot` hook closes that gap; offline there is no second frame, so
   the executor refuses. Any runtime built on this loop must wire
   `refresh_snapshot`.
+- **Every PLAY is fail-closed.** The executor reads perception again after card
+  taps, removes any extra selected cards, reads once more, and requires the
+  selected set to equal the planned set before it can press "Đánh". A failed
+  tap retry must also be confirmed; capture failure is never treated as success.
+- **Critical turn entry uses 3-of-4 consensus.** A single frame can still expose
+  diagnostics and recovery buttons, but no play/pass plan reaches the agent
+  until three matching `MY_TURN` states are observed in the latest four frames.
+  Any phase other than `PLAYING` returns WAIT.
+- **Action completion is verified.** The live runner captures immediately before
+  the action button, checks the planned ROI after the tap with bounded retries,
+  and escalates to hand-cell count where allowed. If verification fails, the
+  runner stops; it does not guess that the action worked and does not
+  automatically pass.
 - **Confidence excludes the turn signals.** The gate decides whether to act; it
   is not evidence about how well the cards were read, so it is deliberately not
   folded into `snapshot.confidence`.
@@ -198,10 +216,6 @@ Windows-side and HWND-bound.
   live: holding four 4s it led a single 4♠, breaking up the quad. That is a
   strategy gap, not a correctness one - every move it makes is legal and uses
   cards it holds - but it will cost games. Nothing in this loop constrains it.
-- **A selected card is skipped, not verified.** `ActionTapExecutor` now leaves an
-  already-lifted card alone, which stops the deselect loop, but it does not check
-  that the selection matches the plan. A card selected by something else - a
-  stray tap, a previous failed turn - would be played along with the intended
-  ones.
-- **No consensus across frames.** `HybridTurnOwnerConsensus` and
-  `TableStateConsensus` exist and are not used here. One frame, one decision.
+- **Selection perception remains a release blocker.** Exact verification now
+  fails safely when a selected lift is missed, but production availability still
+  depends on raising selected-card recall on the locked dataset.

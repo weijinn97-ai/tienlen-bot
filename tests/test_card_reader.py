@@ -402,6 +402,30 @@ class SelectedCardTests(unittest.TestCase):
         boxes = [((100, 540, 80, 200), 1), ((180, 460, 80, 220), 2), ((260, 535, 80, 200), 3)]
         self.assertEqual(self.reader._lifted(boxes), [False, True, False])
 
+    def test_adjacent_lifted_cards_are_one_selected_plateau(self) -> None:
+        boxes = [
+            ((100, 540, 80, 180), 1),
+            ((180, 460, 80, 220), 2),
+            ((260, 464, 80, 220), 3),
+            ((340, 535, 80, 185), 4),
+        ]
+        self.assertEqual(
+            self.reader._lifted(boxes),
+            [False, True, True, False],
+        )
+
+    def test_selected_plateau_at_the_edge_is_detected(self) -> None:
+        boxes = [
+            ((100, 460, 80, 220), 1),
+            ((180, 463, 80, 220), 2),
+            ((260, 535, 80, 185), 3),
+            ((340, 530, 80, 190), 4),
+        ]
+        self.assertEqual(
+            self.reader._lifted(boxes),
+            [True, True, False, False],
+        )
+
     def test_the_fans_own_curve_is_not_a_selection(self) -> None:
         """Adjacent cards in a real fan differ by at most 9px, well under the
         25px lift, so the whole arc must read as unselected."""

@@ -81,17 +81,24 @@ class ActionPlanBuilder:
             ),
             None,
         )
-        if button is None:
+        # Responding to another player, the game shows only "Bỏ Lượt"; "Đánh"
+        # appears once a legal selection exists. Requiring it before the cards
+        # are selected refused every response the bot ever wanted to make - it
+        # sat on a pair of 5s and a pair of 8s against a pair of 4s and did
+        # nothing. For a play, the button is looked for again after selection.
+        if button is None and action != ActionKind.PLAY:
             raise ValueError(f"Required {target_button.value} button is not available.")
 
         cards = tuple(validate_card_code(card) for card in decision.get("cards", []))
-        verify_rois = [button.roi]
+        verify_rois = [button.roi] if button is not None else []
         if action == ActionKind.PLAY:
             detections_by_code = playable_by_code(snapshot)
             missing = [card for card in cards if card not in detections_by_code]
             if missing:
                 raise ValueError(f"Cards are missing from perception: {','.join(missing)}")
             verify_rois.extend(detections_by_code[card].roi for card in cards)
+        if not verify_rois:
+            raise ValueError(f"Nothing to verify for a {action.value} action.")
 
         return ActionPlan(
             kind=action,
@@ -126,12 +133,14 @@ class ActionTapExecutor:
         *,
         refresh_snapshot: Callable[[], PerceptionSnapshot] | None = None,
         confirm_tap: TapConfirmer | None = None,
+        before_commit: Callable[[], None] | None = None,
         selection_delay_seconds: float = 0.2,
         sleep: Callable[[float], None] = time.sleep,
     ) -> None:
         self.controller = controller
         self.refresh_snapshot = refresh_snapshot
         self.confirm_tap = confirm_tap
+        self.before_commit = before_commit
         self.selection_delay_seconds = selection_delay_seconds
         self.sleep = sleep
 
@@ -139,16 +148,16 @@ class ActionTapExecutor:
         self,
         plan: ActionPlan,
         snapshot: PerceptionSnapshot,
-        *,
-        skip_selection: bool = False,
     ) -> tuple[ExecutedTap, ...]:
-        """Carry out a plan. `skip_selection` presses the button without touching
-        the cards, for a retry where the selection is probably already right and
-        tapping again would undo it."""
+        """Carry out a plan, refusing to commit an unverified card selection."""
         if plan.kind == ActionKind.WAIT:
             return ()
         taps: list[ExecutedTap] = []
-        if plan.kind == ActionKind.PLAY and not skip_selection:
+        if plan.kind == ActionKind.PLAY:
+            if self.refresh_snapshot is None:
+                raise ValueError(
+                    "PLAY requires refresh_snapshot to verify the exact selection."
+                )
             detections = playable_by_code(snapshot)
             for code in plan.cards:
                 if code not in detections:
@@ -171,10 +180,18 @@ class ActionTapExecutor:
                 if self.confirm_tap is not None and not self.confirm_tap(roi):
                     self.controller.tap(x, y)
                     taps.append(ExecutedTap(f"{code}(lai)", x, y))
-            if self.refresh_snapshot is not None:
+                    if not self.confirm_tap(roi):
+                        raise ValueError(f"Card tap could not be confirmed after retry: {code}")
+
+            self.sleep(self.selection_delay_seconds)
+            snapshot = self.refresh_snapshot()
+            extra_taps = self._deselect_extras(plan, snapshot)
+            taps.extend(extra_taps)
+            if extra_taps:
                 self.sleep(self.selection_delay_seconds)
                 snapshot = self.refresh_snapshot()
-                taps.extend(self._reconcile(plan, snapshot))
+            self._require_exact_selection(plan, snapshot)
+
         button = next(
             (
                 item
@@ -186,24 +203,21 @@ class ActionTapExecutor:
         if button is None:
             raise ValueError("Action button disappeared before execution.")
 
+        if self.before_commit is not None:
+            self.before_commit()
         x, y = rect_center(button.roi)
         self.controller.tap(x, y)
         taps.append(ExecutedTap(str(plan.target_button), x, y))
         return tuple(taps)
 
-    def _reconcile(self, plan: ActionPlan, snapshot: PerceptionSnapshot) -> list[ExecutedTap]:
-        """Clear any selected card the plan did not ask for, before committing.
+    def _deselect_extras(
+        self, plan: ActionPlan, snapshot: PerceptionSnapshot
+    ) -> list[ExecutedTap]:
+        """Clear selected cards outside the plan, then force another refresh.
 
         A card left selected from an earlier turn, or picked up by a stray tap,
         would be played alongside the intended ones and make the combo illegal.
         Re-reading after the selection taps is the only chance to notice.
-
-        This deliberately only removes. It never re-taps a planned card that does
-        not appear selected, because "not detected as selected" and "not
-        selected" are not the same thing - the reader can miss the lift - and
-        tapping again would toggle a good selection off. That is exactly the loop
-        this whole change exists to stop: twelve identical turns, one card, and a
-        round lost to the clock.
         """
         wanted = set(plan.cards)
         taps: list[ExecutedTap] = []
@@ -217,3 +231,20 @@ class ActionTapExecutor:
             self.controller.tap(x, y)
             taps.append(ExecutedTap(f"-{card.code}", x, y))
         return taps
+
+    @staticmethod
+    def _require_exact_selection(
+        plan: ActionPlan, snapshot: PerceptionSnapshot
+    ) -> None:
+        """Fail closed unless perception proves the selected set equals the plan."""
+        selected = {
+            card.code for card in snapshot.cards if card.zone is CardZone.SELECTED
+        }
+        wanted = set(plan.cards)
+        if selected != wanted:
+            missing = ",".join(sorted(wanted - selected)) or "-"
+            extras = ",".join(sorted(selected - wanted)) or "-"
+            raise ValueError(
+                "Exact card selection was not verified "
+                f"(missing={missing}; extra={extras})."
+            )
